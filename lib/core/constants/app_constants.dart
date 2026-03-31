@@ -44,6 +44,7 @@ abstract class AppRoutes {
   static const documentDetail = '/documents/:id';
   static const search = '/search';
   static const chat = '/chat';
+  static const chatDocument   = '/chat/:docId';
   static const profile = '/profile';
   static const settings = '/settings';
   static const upload = '/upload';

@@ -27,6 +27,12 @@ abstract class AppColors {
   static const amber = Color(0xFFFFB347);
   static const amberDim = Color(0xFFCC8A2E);
   static const amberGlow = Color(0x26FFB347);
+  static const amberTrace = Color(0x1AFFAA00);
+  static const red = Color(0xFFFF3B3B);
+  static const redDim = Color(0xFFCC2A2A);
+  static const redTrace = Color(0x1AFF3B3B);
+  static const green = Color(0xFF00D68F);
+  static const greenTrace = Color(0x1A00D68F);
 
   // Semantic
   static const success = Color(0xFF00E676);
@@ -47,6 +53,20 @@ abstract class AppColors {
   // Gradient stops
   static const gradientTop = Color(0xFF0A0A0A);
   static const gradientBot = Color(0xFF000000);
+
+  static const wire = Color(0xFF2A2A2A);
+  static const wireDim = Color(0xFF1E1E1E);
+  static const wireHot = Color(0xFF404040);
+
+  static const ink0 = Color(0xFFF0F0F0);
+  static const ink1 = Color(0xFF9A9A9A);
+  static const ink2 = Color(0xFF5A5A5A);
+  static const ink3 = Color(0xFF3A3A3A);
+
+  static const signal = Color(0xFF00E5FF);
+  static const signalDim = Color(0xFF0099B3);
+  static const signalTrace = Color(0x1A00E5FF);
+  static const signalGlow = Color(0x3300E5FF);
 }
 
 abstract class AppTextStyles {

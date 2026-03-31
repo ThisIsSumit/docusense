@@ -171,7 +171,7 @@ class _DocumentByIdProviderElement
   String get id => (origin as DocumentByIdProvider).id;
 }
 
-String _$documentsNotifierHash() => r'f3c01c0e23fd48d4b94f67bdaa2f620cbd16c209';
+String _$documentsNotifierHash() => r'780ce39818bf7e727c3a496850b6ff326bf2e117';
 
 /// See also [DocumentsNotifier].
 @ProviderFor(DocumentsNotifier)

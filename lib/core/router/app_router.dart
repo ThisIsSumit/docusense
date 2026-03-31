@@ -1,3 +1,4 @@
+import 'package:docusense/features/chat/presentation/screens/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -135,6 +136,18 @@ GoRouter appRouter(AppRouterRef ref) {
         path: AppRoutes.upload,
         pageBuilder: (context, state) =>
             _slideUp(state, const DocumentUploadScreen()),
+      ),
+       GoRoute(
+        path: AppRoutes.chat,
+        pageBuilder: (context, state) =>
+            _slideUp(state, const ChatScreen()),
+      ),
+        GoRoute(
+        path: AppRoutes.chatDocument,
+        pageBuilder: (context, state) {
+          final docId = state.pathParameters['docId']!;
+          return _slideUp(state, ChatScreen(documentId: docId));
+        },
       ),
     ],
   );

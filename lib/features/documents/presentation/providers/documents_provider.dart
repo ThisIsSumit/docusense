@@ -209,6 +209,31 @@ class DocumentsNotifier extends _$DocumentsNotifier {
     await _fetchPage(state.currentPage);
   }
 
+
+  Future<void> updateDocument(String id,
+      {String? title, List<String>? tags}) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    final box = await ref.read(documentCacheBoxRef.future);
+    final existing = box.get(id);
+    if (existing != null) {
+      final doc = DocumentModel.fromJson(Map<String,dynamic>.from(existing));
+      final updated = doc.copyWith(
+        title: title ?? doc.title,
+        tags: tags ?? doc.tags,
+      );
+      await box.put(id, updated.toJson());
+    }
+    state = state.copyWith(
+      items: state.items.map((d) {
+        if (d.id != id) return d;
+        return d.copyWith(
+          title: title ?? d.title,
+          tags: tags ?? d.tags,
+        );
+      }).toList(),
+    );
+  }
+
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true);
     await _fetchPage(0, initial: true);

@@ -187,11 +187,14 @@ class DocumentActionsSheet extends ConsumerWidget {
             label: 'Re-process',
             iconColor: AppColors.amber,
             labelColor: AppColors.amber,
-            onTap: () {
+            onTap: () async {
               _pop(context);
-              Future.delayed(const Duration(milliseconds: 120), () {
-                if (context.mounted) _showReprocessDialog(context, ref, doc);
-              });
+              await Future.delayed(const Duration(milliseconds: 120));
+              if (!context.mounted) return;
+              final confirmed = await _showReprocessDialog(context);
+              if (confirmed == true && context.mounted) {
+                ref.invalidate(documentByIdProvider(doc.id));
+              }
             },
           ),
           const Divider(height: 0.5),
@@ -342,11 +345,11 @@ Future<void> _downloadFile(BuildContext ctx, DocumentModel doc) async {
   }
 }
 
-void _showReprocessDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
-  showDialog(
+Future<bool?> _showReprocessDialog(BuildContext ctx) {
+  return showDialog<bool>(
     context: ctx,
     barrierColor: Colors.black.withOpacity(0.7),
-    builder: (_) => AlertDialog(
+    builder: (dialogCtx) => AlertDialog(
       backgroundColor: AppColors.surface1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -360,7 +363,7 @@ void _showReprocessDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(ctx),
+          onPressed: () => Navigator.pop(dialogCtx, false),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
@@ -369,12 +372,12 @@ void _showReprocessDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
             minimumSize: const Size(120, 40),
           ),
           onPressed: () async {
-            Navigator.pop(ctx);
-            // Production: POST /documents/{id}/reprocess
-            ref.invalidate(documentByIdProvider(doc.id));
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              _stitchSnack('Reprocessing started'),
-            );
+            if (dialogCtx.mounted) {
+              Navigator.pop(dialogCtx, true);
+              ScaffoldMessenger.of(dialogCtx).showSnackBar(
+                _stitchSnack('Reprocessing started'),
+              );
+            }
           },
           child: const Text('Re-process',
               style: TextStyle(color: AppColors.void0)),

@@ -246,7 +246,7 @@ class _IdleView extends ConsumerWidget {
                     ),
                     Text(
                       'Tap to browse files or drop your document here',
-                      style: AppTextStyles.headingSM,
+                      style: AppTextStyles.monoSM,
                       textAlign: TextAlign.center,
                     ),
                   ],

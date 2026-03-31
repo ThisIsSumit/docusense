@@ -57,7 +57,9 @@ dependencies:
 
   # Auth
   local_auth: ^2.2.0
-  open_file_plus: ^3.4.1+1
+  open_filex: ^4.3.2
+  cupertino_icons: ^1.0.9
+
 
 dev_dependencies:
   flutter_test:

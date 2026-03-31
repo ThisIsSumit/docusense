@@ -56,7 +56,7 @@ class DocumentsState {
 @riverpod
 class DocumentsNotifier extends _$DocumentsNotifier {
   static final _mockDocuments = List.generate(
-    60,
+    20,
     (i) => DocumentModel(
       id: 'doc_$i',
       title: _mockTitles[i % _mockTitles.length],

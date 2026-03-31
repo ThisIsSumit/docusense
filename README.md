@@ -328,4 +328,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For support, questions, or feedback, please open an issue or contact the maintainer at [your-email@example.com].
+For support, questions, or feedback, please open an issue or contact the maintainer at [sumitkumar453827@gmail.com].

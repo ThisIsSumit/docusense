@@ -1,138 +1,188 @@
-# DocuSense — AI Document Intelligence Platform
+Here is your **final, clean, copy-paste-ready `README.md`** (no extra IDs, fully polished):
 
-> Production-grade Flutter app · Riverpod 2 · GoRouter · Hive · Freezed
+```md
+# 🚀 DocuSense — AI Document Intelligence Platform
 
----
+![Flutter](https://img.shields.io/badge/Flutter-3.16%2B-blue?logo=flutter)
+![Riverpod](https://img.shields.io/badge/Riverpod-2.x-green)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-blueviolet)
 
-## Tech Stack
-
-| Layer | Package | Purpose |
-|---|---|---|
-| State | `flutter_riverpod` + `riverpod_annotation` | Code-gen providers, async state |
-| Navigation | `go_router` | Declarative routing, auth guards, shell routes |
-| Models | `freezed` + `json_annotation` | Immutable models, JSON serialization |
-| Local Storage | `hive_flutter` | Fast binary cache (documents, search) |
-| Secure Storage | `flutter_secure_storage` | JWT tokens (AES-256 on Android, Keychain on iOS) |
-| Preferences | `shared_preferences` | Flags (onboarded, settings) |
-| HTTP | `dio` + `retrofit` | REST client, auth interceptor, retry |
-| Animation | `flutter_animate` | Staggered reveals, physics springs |
-| Images | `cached_network_image` | Network image cache |
-| Connectivity | `connectivity_plus` | Online/offline detection |
+> **Production-grade cross-platform document platform with AI-powered search, offline-first caching, and scalable architecture.**
 
 ---
 
-## Architecture
+## 📌 Overview
+
+**DocuSense** is a modern **AI-powered document management platform** built with Flutter.  
+It enables users to securely upload, search, and manage documents with **semantic search, offline-first caching, and smooth UI experiences**.
+
+Designed with **scalability and performance in mind**, it demonstrates production-level architecture using Riverpod, GoRouter, and modular design.
+
+---
+
+## ✨ Features
+
+- 🔐 **Secure Authentication**
+  - JWT-based login with refresh token rotation
+  - Stored securely using AES-256 (Android) / Keychain (iOS)
+
+- ⚡ **Offline-First Architecture**
+  - Hive-powered caching (24h TTL)
+  - Instant UI from cache + background sync
+
+- 🔍 **AI Semantic Search**
+  - 380ms debounced queries
+  - Highlighted results + similarity ranking
+
+- 📄 **Document Management**
+  - Upload, view, delete, organize documents
+  - Metadata + detail view with animations
+
+- 🎨 **Modern UI/UX**
+  - Smooth animations (`flutter_animate`)
+  - Shimmer loaders, glassmorphism UI
+  - Custom fonts (Syne + JetBrains Mono)
+
+- 🌍 **Cross-Platform**
+  - Android, iOS, Web, Windows, macOS, Linux
+
+---
+
+## 🧱 Tech Stack
+
+| Layer            | Tools / Packages |
+|------------------|------------------|
+| State Management | flutter_riverpod, riverpod_annotation |
+| Navigation       | go_router |
+| Models           | freezed, json_annotation |
+| Networking       | dio, retrofit |
+| Local Storage    | hive, hive_flutter |
+| Secure Storage   | flutter_secure_storage |
+| UI & Animation   | flutter_animate, lottie, shimmer |
+| Images           | cached_network_image |
+| Connectivity     | connectivity_plus |
+
+---
+
+## 🏗️ Architecture
 
 ```
+
 lib/
 ├── core/
-│   ├── constants/       app_constants.dart      routes, keys, timeouts
-│   ├── theme/           app_theme.dart           colors, typography, theme
-│   ├── router/          app_router.dart          GoRouter + auth redirect
-│   └── utils/           app_bootstrap.dart       Hive init, SystemChrome
-│                        dio_client.dart          Dio + interceptors
+│   ├── constants/
+│   ├── theme/
+│   ├── router/
+│   └── utils/
 │
 ├── features/
 │   ├── auth/
-│   │   ├── data/models/ auth_models.dart         Freezed UserModel, AuthTokens
-│   │   └── presentation/
-│   │       ├── providers/ auth_provider.dart     AuthStateNotifier (Riverpod)
-│   │       └── screens/  splash, onboarding,
-│   │                      login, register,
-│   │                      forgot_password,
-│   │                      profile
-│   │
 │   ├── documents/
-│   │   ├── data/models/ document_model.dart      Freezed + Hive annotations
-│   │   └── presentation/
-│   │       ├── providers/ documents_provider.dart Pagination + prefetch + cache
-│   │       └── screens/  documents, document_detail
-│   │
 │   ├── home/
-│   │   └── presentation/screens/  home_shell, home_screen
-│   │
 │   └── search/
-│       └── presentation/screens/  search_screen (debounce + highlight)
 │
 └── shared/
-    ├── providers/  connectivity_provider.dart
-    └── widgets/    app_widgets.dart   (TextField, GlowButton, ShimmerBox, ErrorBanner)
+├── providers/
+└── widgets/
+
 ```
 
 ---
 
-## Key Patterns
+## 🔄 Core Workflows
 
-### Auth Flow
-```
-Splash (2.8s + auth resolve) 
-  → not onboarded  →  Onboarding  →  Login
-  → onboarded + logged out         →  Login
-  → onboarded + logged in          →  Home
+### 🔐 Authentication Flow
+
 ```
 
-Auth state persists in **FlutterSecureStorage** (AES-256).  
-Tokens survive app restart. Refresh token rotation on 401.
+Splash → Onboarding → Login → Home
 
-### Caching Strategy
-```
-Network request
-  ├── Cache hit (< 24h)  → serve cache immediately → background refresh
-  └── Cache miss         → fetch → render → persist to Hive
 ```
 
-Documents cached in `Hive.openBox<Map>('documents')` keyed by `doc.id`.  
-LRU eviction at 200 items.
-
-### Lazy Loading + Prefetch
-```dart
-void _onScroll() {
-  final threshold = maxScrollExtent - prefetchThreshold * 120.0;
-  if (pixels >= threshold) {
-    ref.read(documentsNotifierProvider.notifier).onScrolledNearEnd();
-  }
-}
-```
-Triggers next-page fetch 5 items **before** the user hits the bottom — zero loading flicker.
-
-### Debounced Search
-```dart
-_debounce = Timer(Duration(milliseconds: 380), () => _search(query));
-```
-380ms debounce → single network call per typing burst.  
-Results ranked by mock vector similarity score.  
-Query terms highlighted in results via `_HighlightText` widget.
+- Secure token persistence  
+- Auto-login on restart  
+- Token refresh on 401  
 
 ---
 
-## Setup
+### ⚡ Caching Strategy
+
+```
+
+Cache Hit (<24h) → Instant UI → Background Refresh
+Cache Miss       → API Call → Store → Render
+
+````
+
+- Hive-based caching  
+- LRU eviction (200 items)  
+
+---
+
+### 📜 Lazy Loading + Prefetch
+
+- Fetch triggered before reaching list end  
+- Eliminates loading flicker  
+
+---
+
+### 🔍 Debounced Search
+
+- 380ms debounce  
+- Prevents excessive API calls  
+- Highlights matched terms  
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the Repository
 
 ```bash
-# 1. Clone
-git clone https://github.com/you/docusense
+git clone https://github.com/ThisIsSumit/docusense.git
 cd docusense
+````
 
-# 2. Get deps
+### 2. Install Dependencies
+
+```bash
 flutter pub get
+```
 
-# 3. Run code generation (Riverpod, Freezed, JSON, Hive)
+### 3. Run Code Generation
+
+```bash
 dart run build_runner build --delete-conflicting-outputs
+```
 
-# 4. Run
+### 4. Run the App
+
+```bash
 flutter run
+```
 
-# Watch mode during development
+### Dev Mode (Watch)
+
+```bash
 dart run build_runner watch --delete-conflicting-outputs
 ```
 
-### Required assets (add before build)
-Download and place fonts in `assets/fonts/`:
-- `Syne-Regular.ttf`, `Syne-Medium.ttf`, `Syne-Bold.ttf`, `Syne-ExtraBold.ttf`  
-  → https://fonts.google.com/specimen/Syne
-- `JetBrainsMono-Regular.ttf`, `JetBrainsMono-Medium.ttf`  
-  → https://www.jetbrains.com/legalnotice/fonts/
+---
 
-Create empty placeholder dirs (required by pubspec):
+## 🎨 Required Assets
+
+### Fonts
+
+Download and place inside `assets/fonts/`:
+
+* Syne → [https://fonts.google.com/specimen/Syne](https://fonts.google.com/specimen/Syne)
+* JetBrains Mono → [https://www.jetbrains.com/legalnotice/fonts/](https://www.jetbrains.com/legalnotice/fonts/)
+
+---
+
+### Placeholder Directories
+
 ```bash
 mkdir -p assets/images assets/icons assets/lottie
 touch assets/images/.gitkeep assets/icons/.gitkeep assets/lottie/.gitkeep
@@ -140,192 +190,91 @@ touch assets/images/.gitkeep assets/icons/.gitkeep assets/lottie/.gitkeep
 
 ---
 
-## Generated Files
+## ⚙️ Code Generation
 
-After `build_runner`, these files are created automatically:
+Generated files include:
 
-# DocuSense: AI Document Intelligence Platform
+* `*.freezed.dart`
+* `*.g.dart`
+* `*.provider.g.dart`
 
-![Flutter](https://img.shields.io/badge/Flutter-3.16%2B-blue?logo=flutter)
-![Riverpod](https://img.shields.io/badge/Riverpod-2.x-green)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-blueviolet)
+Used for:
 
----
-
-## Overview
-
-**DocuSense** is a production-grade, cross-platform AI Document Intelligence Platform built with Flutter. It enables users to securely upload, search, and manage documents with advanced offline caching, semantic search, and a modern, animated UI. Designed for extensibility and robust state management, DocuSense is ideal for teams and individuals seeking a seamless document experience across devices.
+* Immutable models
+* JSON serialization
+* Riverpod providers
+* Hive adapters
 
 ---
 
-## Features
+## 🔌 Backend Integration
 
-- 🔒 **Secure Auth**: JWT-based login, secure token storage (AES-256/Keychain), refresh token rotation
-- ⚡ **Offline-First**: Hive-powered local cache with LRU eviction and 24h TTL
-- 🔍 **Semantic Search**: Debounced, highlighted, and ranked search results
-- 📄 **Document Management**: Upload, view, delete, and organize documents
-- 🚀 **Modern UI**: Animated transitions, shimmer/skeleton loaders, glassmorphism, and custom fonts
-- 📱 **Multi-Platform**: Android, iOS, Web, Windows, macOS, Linux
-- 🛠️ **Extensible Architecture**: Riverpod 2, GoRouter, Freezed, Dio, Hive, and more
-
----
-
-## Screenshots
-
-<!-- Add screenshots or GIFs here -->
-
----
-
-## Tech Stack
-
-| Layer            | Package(s)                        | Purpose                                 |
-|------------------|-----------------------------------|-----------------------------------------|
-| State Management | flutter_riverpod, riverpod_annotation | Async state, code-gen providers         |
-| Navigation       | go_router                         | Declarative routing, auth guards         |
-| Models           | freezed, json_annotation          | Immutable models, JSON serialization     |
-| Local Storage    | hive_flutter, hive                | Fast binary cache, offline docs          |
-| Secure Storage   | flutter_secure_storage            | JWT tokens, secure key storage           |
-| Preferences      | shared_preferences                | User flags, settings                     |
-| HTTP             | dio                               | REST client, interceptors, retry         |
-| Animation        | flutter_animate, lottie, shimmer  | UI polish, loading states                |
-| Images           | cached_network_image              | Network image cache                      |
-| Connectivity     | connectivity_plus                 | Online/offline detection                 |
-
----
-
-## Architecture
-
-```
-lib/
-├── core/
-│   ├── constants/       # App-wide constants, keys, timeouts
-│   ├── theme/           # Colors, typography, theme
-│   ├── router/          # GoRouter config, auth redirect
-│   └── utils/           # Bootstrap, Dio client, Hive init
-├── features/
-│   ├── auth/            # Auth models, providers, screens
-│   ├── documents/       # Document models, providers, screens
-│   ├── home/            # Home shell, dashboard
-│   └── search/          # Search screen, logic
-└── shared/
-    ├── providers/       # Shared Riverpod providers
-    └── widgets/         # Reusable widgets (TextField, Button, etc.)
-```
-
----
-
-## Key Patterns & Workflows
-
-### Authentication Flow
-
-Splash → Onboarding → Login/Register → Home
-
-- Auth state persisted in secure storage
-- Tokens survive app restart; refresh on 401
-
-### Caching & Offline
-
-- Documents cached in Hive (LRU, 200 items, 24h TTL)
-- Serve cache instantly, refresh in background
-
-### Lazy Loading & Prefetch
-
-- Next-page fetch triggered before scroll end for zero loading flicker
-
-### Debounced Search
-
-- 380ms debounce, single network call per typing burst
-- Results ranked and highlighted
-
----
-
-## Setup & Getting Started
-
-```bash
-# 1. Clone
-git clone https://github.com/your-org/docusense.git
-cd docusense
-
-# 2. Install dependencies
-flutter pub get
-
-# 3. Run code generation (Riverpod, Freezed, JSON, Hive)
-dart run build_runner build --delete-conflicting-outputs
-
-# 4. Launch the app
-flutter run
-
-# (Optional) Watch mode for codegen
-dart run build_runner watch --delete-conflicting-outputs
-```
-
-### Required Assets
-
-- Download and place fonts in `assets/fonts/`:
-  - Syne (Regular, Medium, Bold, ExtraBold): https://fonts.google.com/specimen/Syne
-  - JetBrains Mono (Regular, Medium): https://www.jetbrains.com/legalnotice/fonts/
-- Ensure `assets/images/`, `assets/icons/`, and `assets/lottie/` exist (see pubspec.yaml)
-
----
-
-## Generated Files
-
-After running code generation, these files are auto-created:
-
-| Source                  | Generated Files                        |
-|-------------------------|----------------------------------------|
-| auth_models.dart        | auth_models.freezed.dart, .g.dart      |
-| document_model.dart     | document_model.freezed.dart, .g.dart   |
-| auth_provider.dart      | auth_provider.g.dart                   |
-| documents_provider.dart | documents_provider.g.dart              |
-| app_router.dart         | app_router.g.dart                      |
-| search_screen.dart      | search_screen.g.dart                   |
-| dio_client.dart         | dio_client.g.dart                      |
-| connectivity_provider.dart | connectivity_provider.g.dart         |
-
----
-
-## Connecting to a Real Backend
-
-Replace mock delays in providers with real Dio API calls. Example:
+Replace mock APIs with real endpoints:
 
 ```dart
-final response = await ref.read(dioClientProvider).get('/documents', queryParameters: {'page': page, 'limit': pageSize});
-final items = (response.data['data'] as List).map((j) => DocumentModel.fromJson(j)).toList();
+final response = await dio.get(
+  '/documents',
+  queryParameters: {'page': page, 'limit': pageSize},
+);
+
+final items = (response.data['data'] as List)
+    .map((j) => DocumentModel.fromJson(j))
+    .toList();
 ```
 
 ---
 
-## Screens & Routes
+## 📱 Screens & Routes
 
-| Screen           | Route              | Features                                              |
-|------------------|--------------------|-------------------------------------------------------|
-| Splash           | `/`                | Animated splash, parallel auth resolve                 |
-| Onboarding       | `/onboarding`      | Multi-slide intro, animated icons, dot indicators      |
-| Login            | `/login`           | Secure login, animated fields, JWT storage             |
-| Register         | `/register`        | Slide-up sheet, password validation                    |
-| Forgot Password  | `/forgot-password` | Success state, animated check                          |
-| Home             | `/home`            | Stats, recent docs, shimmer loading                    |
-| Documents        | `/documents`       | Filter, lazy load, prefetch, swipe-to-delete           |
-| Document Detail  | `/documents/:id`   | Hero animation, AI summary, metadata grid              |
-| Search           | `/search`          | Debounced input, highlight, similarity score           |
-| Profile          | `/profile`         | Avatar, stats, settings, sign out                      |
-
----
-
-## Contributing
-
-Contributions are welcome! Please open issues or submit pull requests for improvements, bug fixes, or new features. For major changes, open an issue first to discuss what you would like to change.
+| Screen          | Route            | Description                |
+| --------------- | ---------------- | -------------------------- |
+| Splash          | `/`              | App bootstrap + auth check |
+| Onboarding      | `/onboarding`    | Intro slides               |
+| Login           | `/login`         | Authentication             |
+| Register        | `/register`      | Signup                     |
+| Home            | `/home`          | Dashboard                  |
+| Documents       | `/documents`     | List + filters             |
+| Document Detail | `/documents/:id` | Metadata + AI summary      |
+| Search          | `/search`        | Semantic search            |
+| Profile         | `/profile`       | User settings              |
 
 ---
 
-## License
+## 📸 Screenshots
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+> Add screenshots or demo GIFs here
 
 ---
 
-## Contact
+## 🤝 Contributing
 
-For support, questions, or feedback, please open an issue or contact the maintainer at [sumitkumar453827@gmail.com].
+Contributions are welcome!
+
+1. Fork the repo
+2. Create a feature branch
+3. Submit a PR
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**.
+
+---
+
+## 📬 Contact
+
+**Sumit Kumar**
+📧 [sumitkumar453827@gmail.com](mailto:sumitkumar453827@gmail.com)
+🔗 [https://github.com/ThisIsSumit](https://github.com/ThisIsSumit)
+
+---
+
+## ⭐ Support
+
+If you like this project:
+
+* ⭐ Star the repo
+* 🍴 Fork it
+* 🚀 Share it
+

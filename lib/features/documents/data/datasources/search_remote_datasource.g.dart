@@ -1,26 +1,28 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'document_upload_screen.dart';
+part of 'search_remote_datasource.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$uploadNotifierHash() => r'417bee80f913dc7bac11107304be2a00e9258cf5';
+String _$searchRemoteDatasourceHash() =>
+    r'd11258919dcfb637006aad908e44f8ec0de6b39f';
 
-/// See also [UploadNotifier].
-@ProviderFor(UploadNotifier)
-final uploadNotifierProvider =
-    AutoDisposeNotifierProvider<UploadNotifier, UploadState>.internal(
-  UploadNotifier.new,
-  name: r'uploadNotifierProvider',
+/// See also [searchRemoteDatasource].
+@ProviderFor(searchRemoteDatasource)
+final searchRemoteDatasourceProvider =
+    AutoDisposeProvider<SearchRemoteDatasource>.internal(
+  searchRemoteDatasource,
+  name: r'searchRemoteDatasourceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$uploadNotifierHash,
+      : _$searchRemoteDatasourceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$UploadNotifier = AutoDisposeNotifier<UploadState>;
+typedef SearchRemoteDatasourceRef
+    = AutoDisposeProviderRef<SearchRemoteDatasource>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

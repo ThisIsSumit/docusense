@@ -3,10 +3,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_widgets.dart';
-import '../providers/auth_provider.dart';
+import 'package:docusense/core/constants/app_constants.dart';
+import 'package:docusense/core/theme/app_theme.dart';
+import 'package:docusense/shared/widgets/app_widgets.dart';
+import 'package:docusense/features/auth/presentation/providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -65,37 +65,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-
                 Text('Create\naccount.', style: AppTextStyles.displayLG)
                     .animate()
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.15, end: 0, curve: Curves.easeOutCubic),
-
                 const SizedBox(height: 8),
                 Text('Start for free, no credit card required.',
-                    style: AppTextStyles.bodyMD)
+                        style: AppTextStyles.bodyMD)
                     .animate()
                     .fadeIn(delay: 80.ms, duration: 400.ms),
-
                 const SizedBox(height: 40),
-
                 if (error != null) ...[
                   ErrorBanner(message: error),
                   const SizedBox(height: 20),
                 ],
-
                 AppTextField(
                   label: 'Full Name',
-                  hint: 'Sumit Kumar',
+                  hint: 'First and last name',
                   controller: _nameCtrl,
                   prefixIcon: const Icon(Icons.person_outline_rounded),
                   autofocus: true,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
-
                 const SizedBox(height: 20),
-
                 AppTextField(
                   label: 'Email',
                   hint: 'you@example.com',
@@ -108,9 +100,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     return null;
                   },
                 ).animate().fadeIn(delay: 160.ms, duration: 400.ms),
-
                 const SizedBox(height: 20),
-
                 AppTextField(
                   label: 'Password',
                   hint: '••••••••',
@@ -123,9 +113,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     return null;
                   },
                 ).animate().fadeIn(delay: 220.ms, duration: 400.ms),
-
                 const SizedBox(height: 20),
-
                 AppTextField(
                   label: 'Confirm Password',
                   hint: '••••••••',
@@ -135,21 +123,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _submit(),
                   validator: (v) {
-                    if (v != _passwordCtrl.text) return 'Passwords do not match';
+                    if (v != _passwordCtrl.text) {
+                      return 'Passwords do not match';
+                    }
                     return null;
                   },
                 ).animate().fadeIn(delay: 280.ms, duration: 400.ms),
-
                 const SizedBox(height: 40),
-
                 GlowButton(
                   onPressed: isLoading ? null : _submit,
                   isLoading: isLoading,
                   child: const Text('Create Account'),
                 ).animate().fadeIn(delay: 340.ms, duration: 400.ms),
-
                 const SizedBox(height: 24),
-
                 Center(
                   child: Text(
                     'By signing up you agree to our Terms of Service\nand Privacy Policy.',
@@ -157,7 +143,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
-
                 const SizedBox(height: 40),
               ],
             ),

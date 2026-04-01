@@ -6,7 +6,7 @@ part of 'search_screen.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$searchNotifierHash() => r'f6417aadcb83ea00d382c0c26ff0bfec89259507';
+String _$searchNotifierHash() => r'acdb7cd8bc63f381de8a39efb4f6596670057082';
 
 /// See also [SearchNotifier].
 @ProviderFor(SearchNotifier)
@@ -14,8 +14,9 @@ final searchNotifierProvider = AutoDisposeNotifierProvider<
     SearchNotifier,
     ({
       String query,
-      List<DocumentModel> results,
+      List<SearchResult> results,
       bool isSearching,
+      String? error,
       List<String> recentQueries
     })>.internal(
   SearchNotifier.new,
@@ -30,8 +31,9 @@ final searchNotifierProvider = AutoDisposeNotifierProvider<
 typedef _$SearchNotifier = AutoDisposeNotifier<
     ({
       String query,
-      List<DocumentModel> results,
+      List<SearchResult> results,
       bool isSearching,
+      String? error,
       List<String> recentQueries
     })>;
 // ignore_for_file: type=lint

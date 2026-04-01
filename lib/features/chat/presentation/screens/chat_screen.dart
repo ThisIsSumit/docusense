@@ -55,8 +55,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatState =
-        ref.watch(chatNotifierProvider(documentId: widget.documentId));
+    final chatState = ref.watch(
+        chatNotifierProvider(documentId: widget.documentId));
 
     // Auto-scroll when new content arrives
     ref.listen(
@@ -69,8 +69,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       backgroundColor: AppColors.void1,
       appBar: _ChatAppBar(
         documentId: widget.documentId,
-        messageCount:
-            chatState.messages.where((m) => m.role == MessageRole.user).length,
+        messageCount: chatState.messages
+            .where((m) => m.role == MessageRole.user)
+            .length,
         onClear: () => _notifier.clearMessages(),
       ),
       body: Column(
@@ -174,7 +175,7 @@ class _ScopeBar extends ConsumerWidget {
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.signalTrace,
         border: Border(
           bottom: BorderSide(color: AppColors.wireDim, width: 0.5),
@@ -182,23 +183,19 @@ class _ScopeBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.signal),
+          const Icon(Icons.lock_outline_rounded,
+              size: 12, color: AppColors.signal),
           const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Scoped to document — results from this file only',
-              style: AppTextStyles.monoSM,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
+          Text(
+            'Scoped to document — results from this file only',
+            style: AppTextStyles.monoSM,
           ),
-          const SizedBox(width: 8),
+          const Spacer(),
           GestureDetector(
             onTap: () => context.go(AppRoutes.chat),
-            child: Text(
-              'Search all →',
-              style: AppTextStyles.monoSM.copyWith(color: AppColors.signal),
-            ),
+            child: Text('Search all →',
+                style: AppTextStyles.monoSM
+                    .copyWith(color: AppColors.signal)),
           ),
         ],
       ),
@@ -254,7 +251,8 @@ class _UserBubble extends StatelessWidget {
         children: [
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.signalTrace,
                 borderRadius: const BorderRadius.only(
@@ -264,17 +262,18 @@ class _UserBubble extends StatelessWidget {
                   bottomRight: Radius.circular(10),
                 ),
                 border: Border.all(
-                    color: AppColors.signal.withOpacity(0.2), width: 0.5),
+                    color: AppColors.signal.withOpacity(0.2),
+                    width: 0.5),
               ),
               child: Text(
                 msg.content,
-                style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0),
+                style: AppTextStyles.bodyMD
+                    .copyWith(color: AppColors.ink0),
               ),
             ),
           ),
         ],
-      )
-          .animate()
+      ).animate()
           .fadeIn(delay: Duration(milliseconds: 30 * (index % 8)))
           .slideX(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
     );
@@ -310,7 +309,8 @@ class _AssistantBubble extends StatelessWidget {
                   color: AppColors.signalTrace,
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(
-                      color: AppColors.signal.withOpacity(0.3), width: 0.5),
+                      color: AppColors.signal.withOpacity(0.3),
+                      width: 0.5),
                 ),
                 child: const Icon(
                   Icons.auto_awesome_rounded,
@@ -319,9 +319,8 @@ class _AssistantBubble extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text('DocuSense',
-                  style:
-                      AppTextStyles.labelLG.copyWith(color: AppColors.signal)),
+              Text('DocuSense', style: AppTextStyles.labelLG
+                  .copyWith(color: AppColors.signal)),
               const Spacer(),
               if (msg.tokensUsed != null)
                 Text('${msg.tokensUsed} tok · ${msg.latencyMs}ms',
@@ -343,8 +342,9 @@ class _AssistantBubble extends StatelessWidget {
                 bottomRight: Radius.circular(10),
               ),
               border: Border.all(
-                color:
-                    isError ? AppColors.red.withOpacity(0.3) : AppColors.wire,
+                color: isError
+                    ? AppColors.red.withOpacity(0.3)
+                    : AppColors.wire,
                 width: 0.5,
               ),
             ),
@@ -373,7 +373,8 @@ class _AssistantBubble extends StatelessWidget {
                       style: AppTextStyles.labelMD
                           .copyWith(color: AppColors.ink2)),
                   const SizedBox(height: 8),
-                  ...msg.sources.asMap().entries.map((e) => _SourceChip(
+                  ...msg.sources.asMap().entries.map((e) =>
+                      _SourceChip(
                         index: e.key + 1,
                         citation: e.value,
                       )),
@@ -382,8 +383,7 @@ class _AssistantBubble extends StatelessWidget {
             ),
           ),
         ],
-      )
-          .animate()
+      ).animate()
           .fadeIn(delay: Duration(milliseconds: 30 * (index % 8)))
           .slideX(begin: -0.04, end: 0, curve: Curves.easeOutCubic),
     );
@@ -428,7 +428,8 @@ class _Cursor extends StatefulWidget {
   State<_Cursor> createState() => _CursorState();
 }
 
-class _CursorState extends State<_Cursor> with SingleTickerProviderStateMixin {
+class _CursorState extends State<_Cursor>
+    with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
 
   @override
@@ -448,20 +449,20 @@ class _CursorState extends State<_Cursor> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, __) => Opacity(
-          opacity: _ctrl.value,
-          child: Container(
-            width: 2,
-            height: 14,
-            margin: const EdgeInsets.only(bottom: 2),
-            decoration: BoxDecoration(
-              color: AppColors.signal,
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
+    animation: _ctrl,
+    builder: (_, __) => Opacity(
+      opacity: _ctrl.value,
+      child: Container(
+        width: 2,
+        height: 14,
+        margin: const EdgeInsets.only(bottom: 2),
+        decoration: BoxDecoration(
+          color: AppColors.signal,
+          borderRadius: BorderRadius.circular(1),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _ThinkingDots extends StatefulWidget {
@@ -490,25 +491,25 @@ class _ThinkingDotsState extends State<_ThinkingDots>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, __) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final phase = (_ctrl.value - i * 0.15).clamp(0.0, 1.0);
-            final opacity = 0.2 +
-                (phase < 0.5 ? phase * 1.6 : (1 - phase) * 1.6).clamp(0.0, 0.8);
-            return Container(
-              margin: const EdgeInsets.only(right: 4),
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: AppColors.signal.withOpacity(opacity),
-                shape: BoxShape.circle,
-              ),
-            );
-          }),
-        ),
-      );
+    animation: _ctrl,
+    builder: (_, __) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(3, (i) {
+        final phase = (_ctrl.value - i * 0.15).clamp(0.0, 1.0);
+        final opacity = 0.2 +
+            (phase < 0.5 ? phase * 1.6 : (1 - phase) * 1.6).clamp(0.0, 0.8);
+        return Container(
+          margin: const EdgeInsets.only(right: 4),
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: AppColors.signal.withOpacity(opacity),
+            shape: BoxShape.circle,
+          ),
+        );
+      }),
+    ),
+  );
 }
 
 class _SourceChip extends StatelessWidget {
@@ -550,7 +551,8 @@ class _SourceChip extends StatelessWidget {
               children: [
                 Text(
                   citation.documentTitle,
-                  style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0),
+                  style: AppTextStyles.bodyMD
+                      .copyWith(color: AppColors.ink0),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -616,7 +618,8 @@ class _InputBarState extends State<_InputBar> {
           16, 10, 16, MediaQuery.of(context).padding.bottom + 12),
       decoration: const BoxDecoration(
         color: AppColors.void2,
-        border: Border(top: BorderSide(color: AppColors.wireDim, width: 0.5)),
+        border: Border(
+            top: BorderSide(color: AppColors.wireDim, width: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -639,19 +642,20 @@ class _InputBarState extends State<_InputBar> {
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.newline,
-                style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0),
+                style: AppTextStyles.bodyMD
+                    .copyWith(color: AppColors.ink0),
                 cursorColor: AppColors.signal,
                 decoration: InputDecoration(
                   hintText: widget.isStreaming
                       ? 'Streaming response...'
                       : 'Ask a question...',
-                  hintStyle:
-                      AppTextStyles.bodyMD.copyWith(color: AppColors.ink3),
+                  hintStyle: AppTextStyles.bodyMD
+                      .copyWith(color: AppColors.ink3),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
                 ),
               ),
             ),
@@ -667,12 +671,16 @@ class _InputBarState extends State<_InputBar> {
               decoration: BoxDecoration(
                 color: widget.isStreaming
                     ? AppColors.amberTrace
-                    : (_hasText ? AppColors.signal : AppColors.surface1),
+                    : (_hasText
+                        ? AppColors.signal
+                        : AppColors.surface1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: widget.isStreaming
                       ? AppColors.amber.withOpacity(0.4)
-                      : (_hasText ? Colors.transparent : AppColors.wire),
+                      : (_hasText
+                          ? Colors.transparent
+                          : AppColors.wire),
                   width: 0.5,
                 ),
               ),
@@ -681,7 +689,9 @@ class _InputBarState extends State<_InputBar> {
                   : Icon(
                       Icons.arrow_upward_rounded,
                       size: 18,
-                      color: _hasText ? AppColors.void0 : AppColors.ink3,
+                      color: _hasText
+                          ? AppColors.void0
+                          : AppColors.ink3,
                     ),
             ),
           ),
@@ -719,19 +729,19 @@ class _StreamingIndicatorState extends State<_StreamingIndicator>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, __) => Padding(
-          padding: const EdgeInsets.all(12),
-          child: Container(
-            width: 14 + _ctrl.value * 4,
-            height: 3,
-            decoration: BoxDecoration(
-              color: AppColors.amber,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
+    animation: _ctrl,
+    builder: (_, __) => Padding(
+      padding: const EdgeInsets.all(12),
+      child: Container(
+        width: 14 + _ctrl.value * 4,
+        height: 3,
+        decoration: BoxDecoration(
+          color: AppColors.amber,
+          borderRadius: BorderRadius.circular(2),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -798,16 +808,17 @@ class _SuggestionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface0,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: AppColors.wire, width: 0.5),
-          ),
-          child: Text(label,
-              style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0)),
-        ),
-      );
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface0,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.wire, width: 0.5),
+      ),
+      child: Text(label,
+          style: AppTextStyles.bodyMD
+              .copyWith(color: AppColors.ink0)),
+    ),
+  );
 }

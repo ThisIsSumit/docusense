@@ -1,9 +1,11 @@
+import 'package:docusense/shared/widgets/app_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/connectivity_service.dart';
 
 class HomeShell extends StatelessWidget {
   final Widget child;
@@ -31,7 +33,15 @@ class HomeShell extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.void1,
-      body: child,
+      body: Stack(
+        children: [
+          child,
+          Positioned(
+            top: 0, left: 0, right: 0,
+            child: OfflineBanner(),
+          ),
+        ],
+      ),
       bottomNavigationBar: _BottomNav(
         activeIndex: activeIndex,
         tabs: _tabs,

@@ -43,8 +43,7 @@ class _AppTextFieldState extends State<AppTextField> {
   @override
   void initState() {
     super.initState();
-    _focusNode
-        .addListener(() => setState(() => _focused = _focusNode.hasFocus));
+    _focusNode.addListener(() => setState(() => _focused = _focusNode.hasFocus));
   }
 
   @override
@@ -122,15 +121,18 @@ class _AppTextFieldState extends State<AppTextField> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.accent, width: 1),
+              borderSide:
+                  const BorderSide(color: AppColors.accent, width: 1),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error, width: 1),
+              borderSide:
+                  const BorderSide(color: AppColors.error, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error, width: 1),
+              borderSide:
+                  const BorderSide(color: AppColors.error, width: 1),
             ),
             errorStyle: AppTextStyles.bodySM.copyWith(color: AppColors.error),
           ),
@@ -324,7 +326,8 @@ class _ShimmerBoxState extends State<ShimmerBox>
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
+          borderRadius:
+              widget.borderRadius ?? BorderRadius.circular(8),
           gradient: LinearGradient(
             begin: Alignment(-1 + _anim.value * 2, 0),
             end: Alignment(1 + _anim.value * 2, 0),

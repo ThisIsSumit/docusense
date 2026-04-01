@@ -6,7 +6,21 @@ part of 'dio_client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$dioClientHash() => r'4c326e007d60c7ed4e78d302b1dc5c8a79e9e8f3';
+String _$tokenStorageHash() => r'18102e5de0315934eb6ec474a7688f7fe2ad5a57';
+
+/// See also [tokenStorage].
+@ProviderFor(tokenStorage)
+final tokenStorageProvider = AutoDisposeProvider<FlutterSecureStorage>.internal(
+  tokenStorage,
+  name: r'tokenStorageProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$tokenStorageHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef TokenStorageRef = AutoDisposeProviderRef<FlutterSecureStorage>;
+String _$dioClientHash() => r'0f96de9e32a32fa267d08248739f92e0c692653a';
 
 /// See also [dioClient].
 @ProviderFor(dioClient)

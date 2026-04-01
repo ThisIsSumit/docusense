@@ -1,20 +1,22 @@
+import 'dart:async';
+import 'package:docusense/core/constants/app_constants.dart';
+import 'package:docusense/features/documents/presentation/providers/documents_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../data/models/document_model.dart';
-import '../../../../core/constants/app_constants.dart';
+import 'package:docusense/features/documents/data/models/document_model.dart';
+import 'package:docusense/features/documents/data/datasources/documents_remote_datasource.dart';
+import 'package:docusense/features/documents/data/datasources/search_remote_datasource.dart';
+import 'package:docusense/core/theme/app_theme.dart';
+import 'package:docusense/core/utils/dio_client.dart';
 
 part 'documents_provider.g.dart';
-
-// ── Cache Service ────────────────────────────────────────────────────────────
 
 @riverpod
 Future<Box<Map>> documentCacheBox(DocumentCacheBoxRef ref) async {
   return await Hive.openBox<Map>(AppConstants.documentCacheBox);
 }
-
-// ── Documents List with Pagination + Prefetch ────────────────────────────────
 
 class DocumentsState {
   final List<DocumentModel> items;
@@ -41,87 +43,32 @@ class DocumentsState {
     String? error,
     int? currentPage,
     bool clearError = false,
-  }) {
-    return DocumentsState(
-      items: items ?? this.items,
-      isLoading: isLoading ?? this.isLoading,
-      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-      hasMore: hasMore ?? this.hasMore,
-      error: clearError ? null : (error ?? this.error),
-      currentPage: currentPage ?? this.currentPage,
-    );
-  }
+  }) =>
+      DocumentsState(
+        items: items ?? this.items,
+        isLoading: isLoading ?? this.isLoading,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+        hasMore: hasMore ?? this.hasMore,
+        error: clearError ? null : (error ?? this.error),
+        currentPage: currentPage ?? this.currentPage,
+      );
 }
 
 @riverpod
 class DocumentsNotifier extends _$DocumentsNotifier {
-  static final _mockDocuments = List.generate(
-    20,
-    (i) => DocumentModel(
-      id: 'doc_$i',
-      title: _mockTitles[i % _mockTitles.length],
-      fileName: '${_mockTitles[i % _mockTitles.length].toLowerCase().replaceAll(' ', '_')}.pdf',
-      mimeType: i % 5 == 0 ? 'image/png' : 'application/pdf',
-      fileSizeBytes: (120 + i * 37) * 1024,
-      status: i % 10 == 0
-          ? DocumentStatus.processing
-          : DocumentStatus.ready,
-      summary: i % 3 == 0
-          ? 'AI-generated summary: This document covers key topics including analysis, methodology, and findings across ${i + 3} pages.'
-          : null,
-      tags: [_mockTags[i % _mockTags.length], _mockTags[(i + 2) % _mockTags.length]],
-      pageCount: 3 + (i % 18),
-      queryCount: i * 3,
-      createdAt: DateTime.now().subtract(Duration(days: i * 2)),
-      processedAt: i % 10 == 0
-          ? null
-          : DateTime.now().subtract(Duration(days: i * 2 - 1)),
-      cachedAt: DateTime.now(),
-    ),
-  );
-
-  static const _mockTitles = [
-    'Q4 Financial Report',
-    'Product Roadmap 2025',
-    'Engineering Design Spec',
-    'Market Research Analysis',
-    'User Interview Notes',
-    'Architecture Decision Record',
-    'Compliance Audit Report',
-    'API Documentation v2',
-    'Investor Pitch Deck',
-    'Security Assessment',
-  ];
-
-  static const _mockTags = [
-    'finance', 'product', 'engineering', 'research',
-    'legal', 'hr', 'marketing', 'design',
-  ];
-
   @override
   DocumentsState build() {
-    // Load from cache on init, then refresh
-    _initFromCache();
+    _init();
     return const DocumentsState(isLoading: true);
   }
 
-  Future<void> _initFromCache() async {
-    try {
-      // Try cache first
-      final cached = await _loadFromCache();
-      if (cached.isNotEmpty) {
-        state = DocumentsState(
-          items: cached,
-          isLoading: false,
-          currentPage: 1,
-        );
-        // Background refresh
-        _silentRefresh();
-      } else {
-        await _fetchPage(0, initial: true);
-      }
-    } catch (_) {
-      await _fetchPage(0, initial: true);
+  Future<void> _init() async {
+    final cached = await _loadFromCache();
+    if (cached.isNotEmpty) {
+      state = DocumentsState(items: cached, isLoading: false, currentPage: 1);
+      _backgroundRefresh();
+    } else {
+      await _fetchPage(1, initial: true);
     }
   }
 
@@ -137,10 +84,7 @@ class DocumentsNotifier extends _$DocumentsNotifier {
 
   Future<void> _saveToCache(List<DocumentModel> docs) async {
     final box = await ref.read(documentCacheBoxRef.future);
-    for (final doc in docs) {
-      await box.put(doc.id, doc.toJson());
-    }
-    // Evict oldest if over limit
+    for (final doc in docs) await box.put(doc.id, doc.toJson());
     if (box.length > AppConstants.maxCacheSize) {
       final keys = box.keys.toList();
       for (int i = 0; i < keys.length - AppConstants.maxCacheSize; i++) {
@@ -149,137 +93,113 @@ class DocumentsNotifier extends _$DocumentsNotifier {
     }
   }
 
+  Future<void> _removeFromCache(String id) async {
+    final box = await ref.read(documentCacheBoxRef.future);
+    await box.delete(id);
+  }
+
   Future<void> _fetchPage(int page, {bool initial = false}) async {
-    if (initial) {
-      state = state.copyWith(isLoading: true);
-    }
-
+    if (initial) state = state.copyWith(isLoading: true);
     try {
-      // Simulate network delay
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final start = page * AppConstants.pageSize;
-      final end = (start + AppConstants.pageSize).clamp(0, _mockDocuments.length);
-      final pageItems = _mockDocuments.sublist(start, end);
-
-      await _saveToCache(pageItems);
-
-      if (initial || page == 0) {
+      final result = await ref
+          .read(documentsRemoteDatasourceProvider)
+          .list(page: page, limit: AppConstants.pageSize);
+      await _saveToCache(result.items);
+      if (initial || page == 1) {
         state = DocumentsState(
-          items: pageItems,
-          isLoading: false,
-          hasMore: end < _mockDocuments.length,
-          currentPage: 1,
-        );
+            items: result.items,
+            isLoading: false,
+            hasMore: result.hasMore,
+            currentPage: 1);
       } else {
         state = state.copyWith(
-          items: [...state.items, ...pageItems],
-          isLoadingMore: false,
-          hasMore: end < _mockDocuments.length,
-          currentPage: page + 1,
-        );
+            items: [...state.items, ...result.items],
+            isLoadingMore: false,
+            hasMore: result.hasMore,
+            currentPage: page);
       }
-    } catch (e) {
+    } on ApiException catch (e) {
       state = state.copyWith(
-        isLoading: false,
-        isLoadingMore: false,
-        error: 'Failed to load documents',
-      );
+          isLoading: false, isLoadingMore: false, error: e.message);
+    } catch (_) {
+      state = state.copyWith(
+          isLoading: false,
+          isLoadingMore: false,
+          error: 'Failed to load documents');
     }
   }
 
-  Future<void> _silentRefresh() async {
+  Future<void> _backgroundRefresh() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 400));
-      final start = 0;
-      final end = AppConstants.pageSize.clamp(0, _mockDocuments.length);
-      final pageItems = _mockDocuments.sublist(start, end);
-      await _saveToCache(pageItems);
-      // Only update if user hasn't scrolled far
+      final r = await ref
+          .read(documentsRemoteDatasourceProvider)
+          .list(page: 1, limit: AppConstants.pageSize);
+      await _saveToCache(r.items);
       if (state.currentPage <= 1) {
-        state = state.copyWith(items: pageItems);
+        state = state.copyWith(items: r.items, hasMore: r.hasMore);
       }
     } catch (_) {}
   }
 
-  /// Call this when the list scrolls near the end — prefetch trigger
   Future<void> onScrolledNearEnd() async {
     if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
     state = state.copyWith(isLoadingMore: true);
-    await _fetchPage(state.currentPage);
-  }
-
-
-  Future<void> updateDocument(String id,
-      {String? title, List<String>? tags}) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final box = await ref.read(documentCacheBoxRef.future);
-    final existing = box.get(id);
-    if (existing != null) {
-      final doc = DocumentModel.fromJson(Map<String,dynamic>.from(existing));
-      final updated = doc.copyWith(
-        title: title ?? doc.title,
-        tags: tags ?? doc.tags,
-      );
-      await box.put(id, updated.toJson());
-    }
-    state = state.copyWith(
-      items: state.items.map((d) {
-        if (d.id != id) return d;
-        return d.copyWith(
-          title: title ?? d.title,
-          tags: tags ?? d.tags,
-        );
-      }).toList(),
-    );
+    await _fetchPage(state.currentPage + 1);
   }
 
   Future<void> refresh() async {
-    state = state.copyWith(isLoading: true);
-    await _fetchPage(0, initial: true);
+    state = state.copyWith(isLoading: true, clearError: true);
+    await _fetchPage(1, initial: true);
   }
 
   Future<void> deleteDocument(String id) async {
+    await ref.read(documentsRemoteDatasourceProvider).delete(id);
+    await _removeFromCache(id);
+    state =
+        state.copyWith(items: state.items.where((d) => d.id != id).toList());
+  }
+
+  Future<void> updateDocument(String id,
+      {String? title, List<String>? tags}) async {
+    final updated = await ref
+        .read(documentsRemoteDatasourceProvider)
+        .update(id, title: title, tags: tags);
     final box = await ref.read(documentCacheBoxRef.future);
-    await box.delete(id);
+    await box.put(id, updated.toJson());
     state = state.copyWith(
-      items: state.items.where((d) => d.id != id).toList(),
-    );
+        items: [for (final d in state.items) d.id == id ? updated : d]);
   }
 }
-
-// ── Single document provider (with prefetch) ─────────────────────────────────
 
 @riverpod
 Future<DocumentModel?> documentById(DocumentByIdRef ref, String id) async {
-  // Check cache first
   final box = await ref.read(documentCacheBoxRef.future);
-  final cached = box.get(id);
-  if (cached != null) {
-    final doc = DocumentModel.fromJson(Map<String, dynamic>.from(cached));
-    if (!doc.isStale) return doc;
+  final raw = box.get(id);
+  if (raw != null) {
+    final cached = DocumentModel.fromJson(Map<String, dynamic>.from(raw));
+    if (!cached.isStale) {
+      _refreshDocumentInBackground(ref, id, box);
+      return cached;
+    }
   }
-
-  // Fetch from network
-  await Future.delayed(const Duration(milliseconds: 600));
-
-  // Mock
-  return DocumentModel(
-    id: id,
-    title: 'Document $id',
-    fileName: 'document_$id.pdf',
-    mimeType: 'application/pdf',
-    fileSizeBytes: 2 * 1024 * 1024,
-    status: DocumentStatus.ready,
-    summary: 'This is a detailed AI-generated summary of document $id. It covers the main topics, key entities, and important findings extracted by Claude.',
-    tags: ['analysis', 'report'],
-    pageCount: 12,
-    queryCount: 7,
-    createdAt: DateTime.now().subtract(const Duration(days: 3)),
-    processedAt: DateTime.now().subtract(const Duration(days: 3)),
-    cachedAt: DateTime.now(),
-  );
+  final doc = await ref.read(documentsRemoteDatasourceProvider).getById(id);
+  await box.put(id, doc.toJson());
+  return doc;
 }
 
-// Provider alias to avoid name conflict
+Future<void> _refreshDocumentInBackground(
+    Ref ref, String id, Box<Map> box) async {
+  try {
+    final fresh = await ref.read(documentsRemoteDatasourceProvider).getById(id);
+    await box.put(id, fresh.toJson());
+  } catch (_) {}
+}
+
+@riverpod
+Stream<JobStatus> jobStatusStream(JobStatusStreamRef ref, String jobId) {
+  return ref.read(documentsRemoteDatasourceProvider).pollJobUntilDone(jobId,
+      interval: const Duration(seconds: 2),
+      timeout: const Duration(minutes: 5));
+}
+
 final documentCacheBoxRef = documentCacheBoxProvider;

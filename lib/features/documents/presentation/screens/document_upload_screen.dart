@@ -1,16 +1,41 @@
 import 'dart:math' as math;
+import 'package:docusense/core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:lottie/lottie.dart';
-import 'package:docusense/core/theme/app_theme.dart';
-import 'package:docusense/core/constants/app_constants.dart';
-import 'package:docusense/shared/widgets/app_widgets.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_widgets.dart';
+import '../../data/datasources/documents_remote_datasource.dart';
+import '../providers/documents_provider.dart';
+import '../../../../core/utils/dio_client.dart';
 
 part 'document_upload_screen.g.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lottie asset paths — place these files in assets/lottie/
+//
+//   upload_dropzone.json  — looping idle animation (cloud + arrow bounce)
+//                           Recommended: lottiefiles.com/animations/upload-file
+//   upload_progress.json  — looping AI scan / processing ring
+//                           Recommended: lottiefiles.com/animations/loading-animation
+//   upload_success.json   — one-shot check mark celebration (non-looping)
+//                           Recommended: lottiefiles.com/animations/success-checkmark
+//   upload_error.json     — one-shot shake / red X (non-looping)
+//                           Recommended: lottiefiles.com/animations/error-animation
+//
+// If any asset is missing, the widget renders a built-in CustomPaint fallback
+// so the screen stays functional without assets.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _kDropzoneLottie = 'assets/lottie/upload-drop-zone.json';
+const _kProgressLottie = 'assets/lottie/upload-progress.json';
+const _kSuccessLottie = 'assets/lottie/upload-success.json';
+const _kErrorLottie = 'assets/lottie/upload-error.json';
 
 // ── Upload state ──────────────────────────────────────────────────────────────
 
@@ -19,10 +44,11 @@ enum UploadPhase { idle, picked, uploading, processing, success, failed }
 class UploadState {
   final UploadPhase phase;
   final PlatformFile? file;
-  final double progress; // 0.0 → 1.0
-  final String? processingStep; // shown during AI ingestion
+  final double progress;
+  final String? processingStep;
   final String? error;
   final String? jobId;
+  final int pollProgress;
 
   const UploadState({
     this.phase = UploadPhase.idle,
@@ -31,6 +57,7 @@ class UploadState {
     this.processingStep,
     this.error,
     this.jobId,
+    this.pollProgress = 0,
   });
 
   UploadState copyWith({
@@ -40,6 +67,7 @@ class UploadState {
     String? processingStep,
     String? error,
     String? jobId,
+    int? pollProgress,
     bool clearFile = false,
     bool clearError = false,
   }) =>
@@ -50,8 +78,11 @@ class UploadState {
         processingStep: processingStep ?? this.processingStep,
         error: clearError ? null : (error ?? this.error),
         jobId: jobId ?? this.jobId,
+        pollProgress: pollProgress ?? this.pollProgress,
       );
 }
+
+// ── Notifier ──────────────────────────────────────────────────────────────────
 
 @riverpod
 class UploadNotifier extends _$UploadNotifier {
@@ -66,22 +97,17 @@ class UploadNotifier extends _$UploadNotifier {
         allowMultiple: false,
         withData: true,
       );
-
       if (result == null || result.files.isEmpty) return;
-
       final file = result.files.first;
-
-      // Validate size (50 MB)
-      if ((file.size) > 50 * 1024 * 1024) {
+      if (file.size > AppConstants.maxFileSizeMB * 1024 * 1024) {
         state = state.copyWith(
           phase: UploadPhase.failed,
-          error: 'File exceeds the 50 MB limit.',
+          error: 'File exceeds the ${AppConstants.maxFileSizeMB} MB limit.',
         );
         return;
       }
-
       state = state.copyWith(phase: UploadPhase.picked, file: file);
-    } catch (e) {
+    } catch (_) {
       state = state.copyWith(
         phase: UploadPhase.failed,
         error: 'Could not open file picker.',
@@ -92,63 +118,81 @@ class UploadNotifier extends _$UploadNotifier {
   Future<void> upload() async {
     if (state.file == null) return;
 
-    // ── Simulated upload + processing ────────────────────────────────────────
-    // Replace the blocks below with real Dio multipart call:
-    //
-    //   final formData = FormData.fromMap({
-    //     'file': MultipartFile.fromBytes(state.file!.bytes!, filename: state.file!.name),
-    //   });
-    //   final response = await ref.read(dioClientProvider).post('/documents', data: formData,
-    //     onSendProgress: (sent, total) {
-    //       state = state.copyWith(progress: sent / total * 0.6);
-    //     });
-    //   final jobId = response.data['data']['jobId'];
-    //   // then poll /documents/jobs/:jobId/status
-
-    // Phase 1: Uploading file
     state = state.copyWith(phase: UploadPhase.uploading, progress: 0);
 
-    for (int i = 1; i <= 60; i++) {
-      await Future.delayed(const Duration(milliseconds: 25));
-      state = state.copyWith(progress: i / 100);
-    }
+    try {
+      final result = await ref.read(documentsRemoteDatasourceProvider).upload(
+            file: state.file!,
+            onProgress: (sent, total) {
+              if (total > 0) {
+                state = state.copyWith(
+                    progress: (sent / total * 0.60).clamp(0.0, 0.60));
+              }
+            },
+          );
 
-    // Phase 2: AI processing steps
-    state = state.copyWith(phase: UploadPhase.processing, progress: 0.6);
-    final steps = [
-      'Extracting text content...',
-      'Analyzing document structure...',
-      'Running Claude extraction...',
-      'Generating embeddings...',
-      'Building search index...',
-    ];
-
-    for (int i = 0; i < steps.length; i++) {
       state = state.copyWith(
-        processingStep: steps[i],
-        progress: 0.6 + (i + 1) / steps.length * 0.38,
+        phase: UploadPhase.processing,
+        progress: 0.62,
+        jobId: result.jobId,
+        processingStep: 'Extracting text content...',
       );
-      await Future.delayed(const Duration(milliseconds: 700));
+
+      await for (final job in ref
+          .read(documentsRemoteDatasourceProvider)
+          .pollJobUntilDone(result.jobId)) {
+        final display = 0.62 + job.progressFraction * 0.36;
+        state = state.copyWith(
+          progress: display,
+          processingStep: _stepLabel(job.progressFraction),
+          pollProgress: job.progress.toInt(),
+        );
+
+        if (job.isCompleted) {
+          ref.invalidate(documentsNotifierProvider);
+          state = state.copyWith(
+              phase: UploadPhase.success,
+              progress: 1.0,
+              processingStep: 'Ready to search');
+          return;
+        }
+        if (job.isFailed) {
+          state = state.copyWith(
+              phase: UploadPhase.failed,
+              error: job.failedReason ?? 'Processing failed');
+          return;
+        }
+      }
+    } on ApiException catch (e) {
+      state = state.copyWith(
+        phase: UploadPhase.failed,
+        error: e.isConflict
+            ? 'A document with this name already exists.'
+            : e.message,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        phase: UploadPhase.failed,
+        error: 'Upload failed. Check your connection and try again.',
+      );
     }
-
-    state = state.copyWith(
-      phase: UploadPhase.success,
-      progress: 1.0,
-      jobId: 'job_${DateTime.now().millisecondsSinceEpoch}',
-    );
   }
 
-  void reset() {
-    state = const UploadState();
+  String _stepLabel(double p) {
+    if (p < 0.20) return 'Extracting text content...';
+    if (p < 0.40) return 'Running Claude extraction...';
+    if (p < 0.60) return 'Chunking document...';
+    if (p < 0.80) return 'Generating Voyage AI embeddings...';
+    return 'Building HNSW search index...';
   }
 
-  void clearError() {
-    state = state.copyWith(
-      phase: UploadPhase.idle,
-      clearError: true,
-      clearFile: true,
-    );
-  }
+  void reset() => state = const UploadState();
+
+  void clearError() => state = state.copyWith(
+        phase: UploadPhase.idle,
+        clearError: true,
+        clearFile: true,
+      );
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -168,10 +212,7 @@ class DocumentUploadScreen extends ConsumerWidget {
           icon: const Icon(Icons.close_rounded, size: 20),
           onPressed: () => context.pop(),
         ),
-        title: Text(
-          'Upload Document',
-          style: AppTextStyles.headingSM,
-        ),
+        title: Text('Upload Document', style: AppTextStyles.headingSM),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -180,31 +221,24 @@ class DocumentUploadScreen extends ConsumerWidget {
           transitionBuilder: (child, anim) => FadeTransition(
             opacity: anim,
             child: SlideTransition(
-              position: Tween(
-                begin: const Offset(0, 0.05),
-                end: Offset.zero,
-              ).animate(
-                  CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+              position: Tween(begin: const Offset(0, 0.04), end: Offset.zero)
+                  .animate(CurvedAnimation(
+                      parent: anim, curve: Curves.easeOutCubic)),
               child: child,
             ),
           ),
           child: switch (upload.phase) {
             UploadPhase.idle => _IdleView(key: const ValueKey('idle')),
-            UploadPhase.picked => _PickedView(
-                key: const ValueKey('picked'),
-                file: upload.file!,
-              ),
+            UploadPhase.picked =>
+              _PickedView(key: const ValueKey('picked'), file: upload.file!),
             UploadPhase.uploading ||
             UploadPhase.processing =>
               _ProgressView(key: const ValueKey('progress'), upload: upload),
-            UploadPhase.success => _SuccessView(
-                key: const ValueKey('success'),
-                file: upload.file!,
-              ),
+            UploadPhase.success =>
+              _SuccessView(key: const ValueKey('success'), file: upload.file!),
             UploadPhase.failed => _FailedView(
                 key: const ValueKey('failed'),
-                error: upload.error ?? 'Upload failed',
-              ),
+                error: upload.error ?? 'Upload failed'),
           },
         ),
       ),
@@ -212,7 +246,9 @@ class DocumentUploadScreen extends ConsumerWidget {
   }
 }
 
-// ── Idle state — drop zone ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// IDLE — Drop zone with Lottie or CustomPaint fallback
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _IdleView extends ConsumerWidget {
   const _IdleView({super.key});
@@ -225,34 +261,9 @@ class _IdleView extends ConsumerWidget {
         children: [
           const SizedBox(height: 12),
 
-          // Drop zone
-          GestureDetector(
+          // ── Drop zone ──────────────────────────────────────────────────
+          _TappableDropZone(
             onTap: () => ref.read(uploadNotifierProvider.notifier).pickFile(),
-            child: Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.surface0,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.accent, width: 1.2),
-              ),
-              child: Center(
-                child: Column(
-                  children: [
-                    Lottie.asset(
-                      'assets/lottie/upload-drop-zone.json',
-                      height: 120,
-                      repeat: true,
-                    ),
-                    Text(
-                      'Tap to browse files or drop your document here',
-                      style: AppTextStyles.monoSM,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ).animate().fadeIn(delay: 100.ms).scale(
                 begin: const Offset(0.96, 0.96),
                 curve: Curves.easeOutCubic,
@@ -260,11 +271,9 @@ class _IdleView extends ConsumerWidget {
 
           const SizedBox(height: 32),
 
-          // Supported types
-          Text(
-            'SUPPORTED FORMATS',
-            style: AppTextStyles.labelMD,
-          ).animate().fadeIn(delay: 200.ms),
+          Text('SUPPORTED FORMATS', style: AppTextStyles.labelMD)
+              .animate()
+              .fadeIn(delay: 200.ms),
 
           const SizedBox(height: 16),
 
@@ -272,51 +281,583 @@ class _IdleView extends ConsumerWidget {
             spacing: 10,
             runSpacing: 10,
             alignment: WrapAlignment.center,
-            children: [
+            children: const [
               _FormatBadge(
-                ext: 'PDF',
-                icon: Icons.picture_as_pdf_outlined,
-                color: AppColors.error,
-              ),
+                  ext: 'PDF',
+                  icon: Icons.picture_as_pdf_outlined,
+                  color: AppColors.red),
               _FormatBadge(
-                ext: 'PNG',
-                icon: Icons.image_outlined,
-                color: AppColors.info,
-              ),
+                  ext: 'PNG',
+                  icon: Icons.image_outlined,
+                  color: AppColors.signal),
               _FormatBadge(
                   ext: 'JPG',
                   icon: Icons.image_outlined,
-                  color: AppColors.info),
+                  color: AppColors.signal),
               _FormatBadge(
                   ext: 'DOCX',
                   icon: Icons.description_outlined,
-                  color: AppColors.accent),
+                  color: AppColors.amber),
               _FormatBadge(
                   ext: 'TXT',
                   icon: Icons.article_outlined,
-                  color: AppColors.amber),
+                  color: AppColors.ink1),
             ],
           ).animate().fadeIn(delay: 280.ms),
 
-// Removed misplaced Image.asset and textAlign from children list.
+          const Spacer(),
+
+          Text('Maximum file size: ${AppConstants.maxFileSizeMB} MB',
+                  style: AppTextStyles.bodySM, textAlign: TextAlign.center)
+              .animate()
+              .fadeIn(delay: 380.ms),
         ],
       ),
     );
   }
 }
 
-class _DropZone extends StatefulWidget {
+/// Drop zone — shows Lottie animation when asset exists,
+/// falls back to the pulsing CustomPaint orbit otherwise.
+class _TappableDropZone extends StatefulWidget {
   final VoidCallback onTap;
-  const _DropZone({required this.onTap});
+  const _TappableDropZone({required this.onTap});
 
   @override
-  State<_DropZone> createState() => _DropZoneState();
+  State<_TappableDropZone> createState() => _TappableDropZoneState();
 }
 
-class _DropZoneState extends State<_DropZone>
+class _TappableDropZoneState extends State<_TappableDropZone>
+    with SingleTickerProviderStateMixin {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedContainer(
+        duration: AppConstants.microDuration,
+        height: 240,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: _pressed ? AppColors.signalTrace : AppColors.surface0,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _pressed ? AppColors.signal : AppColors.wire,
+            width: _pressed ? 1.0 : 0.5,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Corner brackets
+            ..._corners(),
+            // Lottie OR fallback
+            Center(
+              child: _LottieOrFallback(
+                assetPath: _kDropzoneLottie,
+                height: 160,
+                repeat: true, // idle animation loops forever
+                fallback: _DropzoneFallback(pressed: _pressed),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _corners() {
+    Widget c(double top, double? bottom, double? left, double? right,
+            double rot) =>
+        Positioned(
+          top: top >= 0 ? top : null,
+          bottom: bottom,
+          left: left,
+          right: right,
+          child: Transform.rotate(
+            angle: rot * math.pi / 180,
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CustomPaint(
+                painter: _CornerPainter(
+                  color: AppColors.signal.withOpacity(0.35),
+                  thickness: 1.5,
+                ),
+              ),
+            ),
+          ),
+        );
+    return [
+      c(12, null, 12, null, 0),
+      c(12, null, null, 12, 90),
+      c(-1, 12, null, 12, 180),
+      c(-1, 12, 12, null, 270),
+    ];
+  }
+}
+
+/// Shows Lottie if the asset is bundled, otherwise renders [fallback].
+class _LottieOrFallback extends StatelessWidget {
+  final String assetPath;
+  final double height;
+  final bool repeat;
+  final Widget fallback;
+  final VoidCallback? onLoaded;
+
+  const _LottieOrFallback({
+    required this.assetPath,
+    required this.height,
+    required this.repeat,
+    required this.fallback,
+    this.onLoaded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _LottieAssetChecker(
+      assetPath: assetPath,
+      height: height,
+      repeat: repeat,
+      fallback: fallback,
+      onLoaded: onLoaded,
+    );
+  }
+}
+
+/// Tries to load a Lottie asset; shows [fallback] on any error.
+class _LottieAssetChecker extends StatefulWidget {
+  final String assetPath;
+  final double height;
+  final bool repeat;
+  final Widget fallback;
+  final VoidCallback? onLoaded;
+
+  const _LottieAssetChecker({
+    required this.assetPath,
+    required this.height,
+    required this.repeat,
+    required this.fallback,
+    this.onLoaded,
+  });
+
+  @override
+  State<_LottieAssetChecker> createState() => _LottieAssetCheckerState();
+}
+
+class _LottieAssetCheckerState extends State<_LottieAssetChecker> {
+  bool _failed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) return widget.fallback;
+
+    return Lottie.asset(
+      widget.assetPath,
+      height: widget.height,
+      repeat: widget.repeat,
+      // animate: true → default, plays immediately
+      errorBuilder: (_, __, ___) {
+        // Called when asset is missing or corrupt
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _failed = true);
+        });
+        return widget.fallback;
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROGRESS — Lottie looping scan, falls back to OrbitRing
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProgressView extends StatelessWidget {
+  final UploadState upload;
+  const _ProgressView({super.key, required this.upload});
+
+  @override
+  Widget build(BuildContext context) {
+    final isProcessing = upload.phase == UploadPhase.processing;
+    final pct = (upload.progress * 100).round();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Lottie processing animation (loops while active)
+          // Falls back to the spinning OrbitRing CustomPaint
+          SizedBox(
+            height: 180,
+            child: _LottieOrFallback(
+              assetPath: _kProgressLottie,
+              height: 180,
+              repeat: true, // loops until phase changes
+              fallback: _OrbitRing(isProcessing: isProcessing),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          AnimatedSwitcher(
+            duration: AppConstants.microDuration,
+            child: Text(
+              isProcessing ? 'Processing' : 'Uploading',
+              key: ValueKey(upload.phase),
+              style: AppTextStyles.headingMD,
+            ).animate().fadeIn(),
+          ),
+
+          const SizedBox(height: 8),
+
+          AnimatedSwitcher(
+            duration: AppConstants.standardDuration,
+            child: Text(
+              upload.processingStep ?? (upload.file?.name ?? '').truncate(40),
+              key: ValueKey(upload.processingStep),
+              style: AppTextStyles.bodyMD,
+              textAlign: TextAlign.center,
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Progress bar
+          Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(isProcessing ? 'AI pipeline' : 'Uploading',
+                      style: AppTextStyles.monoSM),
+                  Text('$pct%', style: AppTextStyles.monoSM),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Stack(children: [
+                Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                AnimatedFractionallySizedBox(
+                  duration: const Duration(milliseconds: 300),
+                  widthFactor: upload.progress,
+                  child: Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: AppColors.signal,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUCCESS — one-shot Lottie, falls back to check circle
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SuccessView extends ConsumerWidget {
+  final PlatformFile file;
+  const _SuccessView({super.key, required this.file});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // One-shot success animation — plays once, no loop
+          SizedBox(
+            height: 160,
+            child: _LottieOrFallback(
+              assetPath: _kSuccessLottie,
+              height: 160,
+              repeat: false, // ← plays exactly once
+              fallback: _SuccessFallback(),
+            ),
+          ).animate().scale(
+                begin: const Offset(0.7, 0.7),
+                curve: const Cubic(0.34, 1.56, 0.64, 1),
+                duration: 600.ms,
+              ),
+
+          const SizedBox(height: 28),
+
+          Text('Indexed and ready.', style: AppTextStyles.displayMD)
+              .animate()
+              .fadeIn(delay: 300.ms)
+              .slideY(begin: 0.15, end: 0, curve: Curves.easeOutCubic),
+
+          const SizedBox(height: 8),
+
+          Text(
+            '"${file.name.truncate(36)}" is searchable.\nAsk DocuSense anything about it.',
+            style: AppTextStyles.bodyLG,
+            textAlign: TextAlign.center,
+          ).animate().fadeIn(delay: 400.ms),
+
+          const SizedBox(height: 40),
+
+          // Live processing status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.signalTrace,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: AppColors.signal.withOpacity(0.2), width: 0.5),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: AppColors.signal),
+                ),
+                const SizedBox(width: 10),
+                Text('Building search index in background...',
+                    style: AppTextStyles.bodyMD),
+              ],
+            ),
+          ).animate().fadeIn(delay: 500.ms),
+
+          const SizedBox(height: 32),
+
+          GlowButton(
+            onPressed: () {
+              ref.read(uploadNotifierProvider.notifier).reset();
+              context.go(AppRoutes.documents);
+            },
+            child: const Text('View Documents'),
+          ).animate().fadeIn(delay: 600.ms),
+
+          const SizedBox(height: 12),
+
+          TextButton(
+            onPressed: () => ref.read(uploadNotifierProvider.notifier).reset(),
+            child: Text('Upload another',
+                style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink1)),
+          ).animate().fadeIn(delay: 700.ms),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FAILED — one-shot Lottie, falls back to error circle
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _FailedView extends ConsumerWidget {
+  final String error;
+  const _FailedView({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // One-shot error animation — plays once, no loop
+          SizedBox(
+            height: 160,
+            child: _LottieOrFallback(
+              assetPath: _kErrorLottie,
+              height: 160,
+              repeat: false, // ← plays exactly once
+              fallback: _ErrorFallback(),
+            ),
+          )
+              .animate()
+              .scale(
+                begin: const Offset(0.5, 0.5),
+                curve: const Cubic(0.34, 1.56, 0.64, 1),
+              )
+              .fadeIn(),
+
+          const SizedBox(height: 24),
+
+          Text('Upload failed', style: AppTextStyles.displayMD)
+              .animate()
+              .fadeIn(delay: 200.ms),
+
+          const SizedBox(height: 10),
+
+          Text(error, style: AppTextStyles.bodyLG, textAlign: TextAlign.center)
+              .animate()
+              .fadeIn(delay: 280.ms),
+
+          const SizedBox(height: 40),
+
+          GlowButton(
+            onPressed: () =>
+                ref.read(uploadNotifierProvider.notifier).clearError(),
+            color: AppColors.red,
+            child: const Text('Try Again'),
+          ).animate().fadeIn(delay: 360.ms),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PICKED — unchanged, no Lottie needed
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PickedView extends ConsumerWidget {
+  final PlatformFile file;
+  const _PickedView({super.key, required this.file});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ext = file.extension?.toUpperCase() ?? 'FILE';
+    final sizeMb = (file.size / (1024 * 1024)).toStringAsFixed(2);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface0,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.wire, width: 0.5),
+            ),
+            child: Row(children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(ext,
+                      style: AppTextStyles.monoSM.copyWith(
+                          color: AppColors.red,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                  child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(file.name,
+                      style: AppTextStyles.headingSM,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 3),
+                  Text('$sizeMb MB', style: AppTextStyles.bodyMD),
+                ],
+              )),
+              IconButton(
+                icon: const Icon(Icons.swap_horiz_rounded,
+                    color: AppColors.ink2, size: 18),
+                onPressed: () =>
+                    ref.read(uploadNotifierProvider.notifier).pickFile(),
+              ),
+            ]),
+          )
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.signalTrace,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: AppColors.signal.withOpacity(0.15), width: 0.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('What happens next',
+                    style: AppTextStyles.headingSM
+                        .copyWith(color: AppColors.signal)),
+                const SizedBox(height: 10),
+                ...[
+                  (
+                    'Claude extracts structure, entities & dates',
+                    Icons.auto_awesome_outlined
+                  ),
+                  ('Voyage AI chunks & embeds all text', Icons.hub_outlined),
+                  (
+                    'HNSW vector index built for instant search',
+                    Icons.search_rounded
+                  ),
+                ].map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(children: [
+                        Icon(item.$2, color: AppColors.signalDim, size: 14),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(item.$1, style: AppTextStyles.bodyMD)),
+                      ]),
+                    )),
+              ],
+            ),
+          ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
+          const Spacer(),
+          GlowButton(
+            onPressed: () => ref.read(uploadNotifierProvider.notifier).upload(),
+            child: const Text('Upload & Process'),
+          ).animate().fadeIn(delay: 280.ms),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton(
+              onPressed: () =>
+                  ref.read(uploadNotifierProvider.notifier).reset(),
+              child: Text('Cancel',
+                  style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink2)),
+            ),
+          ).animate().fadeIn(delay: 330.ms),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FALLBACK WIDGETS — shown when Lottie assets are not bundled
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Fallback for drop zone — pulsing cloud icon
+class _DropzoneFallback extends StatefulWidget {
+  final bool pressed;
+  const _DropzoneFallback({required this.pressed});
+
+  @override
+  State<_DropzoneFallback> createState() => _DropzoneFallbackState();
+}
+
+class _DropzoneFallbackState extends State<_DropzoneFallback>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulse;
-  bool _hovering = false;
 
   @override
   void initState() {
@@ -334,382 +875,36 @@ class _DropZoneState extends State<_DropZone>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      onTapDown: (_) => setState(() => _hovering = true),
-      onTapUp: (_) => setState(() => _hovering = false),
-      onTapCancel: () => setState(() => _hovering = false),
-      child: AnimatedContainer(
-        duration: AppConstants.microDuration,
-        height: 260,
-        decoration: BoxDecoration(
-          color: _hovering ? AppColors.accentFaint : AppColors.surface0,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: _hovering ? AppColors.accent : AppColors.border,
-            width: _hovering ? 1.5 : 1,
-          ),
-        ),
-        child: Stack(
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _pulse,
+        builder: (_, __) => Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Animated corner accents
-            ..._corners(),
-
-            // Center content
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Pulsing upload icon container
-                  AnimatedBuilder(
-                    animation: _pulse,
-                    builder: (_, __) => Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent
-                            .withOpacity(0.06 + _pulse.value * 0.06),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.accent
-                              .withOpacity(0.2 + _pulse.value * 0.15),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.cloud_upload_outlined,
-                        color: AppColors.accent,
-                        size: 36,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Text(
-                    'Tap to browse files',
-                    style: AppTextStyles.headingSM,
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    'or drop your document here',
-                    style: AppTextStyles.bodyMD,
-                  ),
-                ],
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.signal.withOpacity(0.06 + _pulse.value * 0.06),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color:
+                      AppColors.signal.withOpacity(0.2 + _pulse.value * 0.15),
+                  width: 0.5,
+                ),
               ),
+              child: const Icon(Icons.cloud_upload_outlined,
+                  color: AppColors.signal, size: 32),
             ),
+            const SizedBox(height: 16),
+            Text('Tap to browse files', style: AppTextStyles.headingSM),
+            const SizedBox(height: 4),
+            Text('PDF · PNG · JPG · DOCX · TXT', style: AppTextStyles.bodyMD),
           ],
         ),
-      ),
-    );
-  }
-
-  List<Widget> _corners() {
-    const size = 20.0;
-    const thickness = 2.0;
-    final color = AppColors.accent.withOpacity(0.4);
-
-    Widget corner(Alignment alignment, double rotationDeg) {
-      return Positioned(
-        top: alignment.y < 0 ? 12 : null,
-        bottom: alignment.y > 0 ? 12 : null,
-        left: alignment.x < 0 ? 12 : null,
-        right: alignment.x > 0 ? 12 : null,
-        child: Transform.rotate(
-          angle: rotationDeg * math.pi / 180,
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: CustomPaint(
-              painter: _CornerPainter(color: color, thickness: thickness),
-            ),
-          ),
-        ),
       );
-    }
-
-    return [
-      corner(Alignment.topLeft, 0),
-      corner(Alignment.topRight, 90),
-      corner(Alignment.bottomRight, 180),
-      corner(Alignment.bottomLeft, 270),
-    ];
-  }
 }
 
-class _CornerPainter extends CustomPainter {
-  final Color color;
-  final double thickness;
-  const _CornerPainter({required this.color, required this.thickness});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = thickness
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset.zero, Offset(size.width, 0), paint);
-    canvas.drawLine(Offset.zero, Offset(0, size.height), paint);
-  }
-
-  @override
-  bool shouldRepaint(_CornerPainter old) =>
-      old.color != color || old.thickness != thickness;
-}
-
-class _FormatBadge extends StatelessWidget {
-  final String ext;
-  final IconData icon;
-  final Color color;
-
-  const _FormatBadge({
-    required this.ext,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            ext,
-            style: AppTextStyles.monoSM.copyWith(color: color),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Picked state — file preview + confirm ─────────────────────────────────────
-
-class _PickedView extends ConsumerWidget {
-  final PlatformFile file;
-  const _PickedView({super.key, required this.file});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ext = file.extension?.toUpperCase() ?? 'FILE';
-    final sizeMb = (file.size / (1024 * 1024)).toStringAsFixed(2);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 24),
-
-          // File card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surface0,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                // File type icon
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      ext,
-                      style: AppTextStyles.monoSM.copyWith(
-                        color: AppColors.error,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 16),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        file.name,
-                        style: AppTextStyles.headingSM,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$sizeMb MB',
-                        style: AppTextStyles.bodyMD,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Re-pick
-                IconButton(
-                  icon: const Icon(
-                    Icons.swap_horiz_rounded,
-                    color: AppColors.textTertiary,
-                    size: 20,
-                  ),
-                  onPressed: () =>
-                      ref.read(uploadNotifierProvider.notifier).pickFile(),
-                ),
-              ],
-            ),
-          )
-              .animate()
-              .fadeIn(duration: 400.ms)
-              .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
-
-          const SizedBox(height: 20),
-
-          // What happens next
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.accentFaint,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.accent.withOpacity(0.15)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'What happens next',
-                  style:
-                      AppTextStyles.headingSM.copyWith(color: AppColors.accent),
-                ),
-                const SizedBox(height: 12),
-                ...[
-                  (
-                    'Claude extracts structure, entities & dates',
-                    Icons.auto_awesome_outlined
-                  ),
-                  (
-                    'Text is chunked & embedded via Voyage AI',
-                    Icons.hub_outlined
-                  ),
-                  (
-                    'HNSW vector index built for instant search',
-                    Icons.search_rounded
-                  ),
-                ].map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Icon(item.$2, color: AppColors.accentDim, size: 16),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(item.$1, style: AppTextStyles.bodyMD),
-                          ),
-                        ],
-                      ),
-                    )),
-              ],
-            ),
-          )
-              .animate()
-              .fadeIn(delay: 150.ms, duration: 400.ms)
-              .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
-
-          const Spacer(),
-
-          // Upload CTA
-          GlowButton(
-            onPressed: () => ref.read(uploadNotifierProvider.notifier).upload(),
-            child: const Text('Upload & Process'),
-          )
-              .animate()
-              .fadeIn(delay: 280.ms, duration: 400.ms)
-              .slideY(begin: 0.1, end: 0),
-
-          const SizedBox(height: 12),
-
-          Center(
-            child: TextButton(
-              onPressed: () =>
-                  ref.read(uploadNotifierProvider.notifier).reset(),
-              child: Text(
-                'Cancel',
-                style: AppTextStyles.bodyMD
-                    .copyWith(color: AppColors.textTertiary),
-              ),
-            ),
-          ).animate().fadeIn(delay: 330.ms),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Progress state ────────────────────────────────────────────────────────────
-
-class _ProgressView extends StatelessWidget {
-  final UploadState upload;
-  const _ProgressView({super.key, required this.upload});
-
-  @override
-  Widget build(BuildContext context) {
-    final isProcessing = upload.phase == UploadPhase.processing;
-    final pct = (upload.progress * 100).round();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Lottie progress animation (centered)
-          Center(
-            child: Lottie.asset(
-              'assets/lottie/upload-progress.json',
-              height: 320,
-              repeat: true,
-            ),
-          ),
-          const SizedBox(height: 40),
-          Text(
-            isProcessing ? 'Processing' : 'Uploading',
-            style: AppTextStyles.headingMD,
-          ).animate(key: ValueKey(upload.phase)).fadeIn(),
-          const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: AppConstants.standardDuration,
-            child: Text(
-              upload.processingStep ??
-                  '${upload.file?.name ?? ''}'.truncate(40),
-              key: ValueKey(upload.processingStep),
-              style: AppTextStyles.bodyMD,
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+/// Fallback for progress — spinning orbit ring
 class _OrbitRing extends StatefulWidget {
   final bool isProcessing;
   const _OrbitRing({required this.isProcessing});
@@ -726,13 +921,11 @@ class _OrbitRingState extends State<_OrbitRing> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _rotate = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
+        vsync: this, duration: const Duration(milliseconds: 1800))
+      ..repeat();
     _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
   }
 
   @override
@@ -743,232 +936,164 @@ class _OrbitRingState extends State<_OrbitRing> with TickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_rotate, _pulse]),
-      builder: (_, __) => SizedBox(
-        width: 120,
-        height: 120,
-        child: CustomPaint(
-          painter: _OrbitPainter(
-            rotation: _rotate.value,
-            pulse: _pulse.value,
-            isProcessing: widget.isProcessing,
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: Listenable.merge([_rotate, _pulse]),
+        builder: (_, __) => SizedBox(
+          width: 120,
+          height: 120,
+          child: CustomPaint(
+            painter: _OrbitPainter(
+              rotation: _rotate.value,
+              pulse: _pulse.value,
+              isProcessing: widget.isProcessing,
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _OrbitPainter extends CustomPainter {
-  final double rotation;
-  final double pulse;
+  final double rotation, pulse;
   final bool isProcessing;
-
-  const _OrbitPainter({
-    required this.rotation,
-    required this.pulse,
-    required this.isProcessing,
-  });
+  const _OrbitPainter(
+      {required this.rotation,
+      required this.pulse,
+      required this.isProcessing});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
+    final cx = size.width / 2, cy = size.height / 2;
     final r = size.width / 2 - 4;
-
-    // Outer glow ring
-    final glowPaint = Paint()
-      ..color = AppColors.accent.withOpacity(0.06 + pulse * 0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 16;
-    canvas.drawCircle(Offset(cx, cy), r, glowPaint);
-
-    // Track ring
-    final trackPaint = Paint()
-      ..color = AppColors.surface2
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawCircle(Offset(cx, cy), r, trackPaint);
-
-    // Arc
-    final arcPaint = Paint()
-      ..color = AppColors.accent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-
+    canvas.drawCircle(
+        Offset(cx, cy),
+        r,
+        Paint()
+          ..color = AppColors.surface2
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5);
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: r),
       rotation * 2 * math.pi - math.pi / 2,
       isProcessing ? math.pi * 1.5 : math.pi * 0.8,
       false,
-      arcPaint,
+      Paint()
+        ..color = AppColors.signal
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
     );
-
-    // Center icon
-    final iconPaint = Paint()
-      ..color = AppColors.accent.withOpacity(0.8 + pulse * 0.2)
-      ..style = PaintingStyle.fill;
-
     if (isProcessing) {
-      // AI sparkle dots
       for (int i = 0; i < 3; i++) {
         final angle = rotation * 2 * math.pi + i * 2 * math.pi / 3;
-        final dotR = 5.0 + pulse * 2;
-        final ox = cx + math.cos(angle) * 14;
-        final oy = cy + math.sin(angle) * 14;
         canvas.drawCircle(
-          Offset(ox, oy),
-          dotR * (i == 0 ? 1.0 : 0.6),
-          iconPaint..color = AppColors.accent.withOpacity(i == 0 ? 1.0 : 0.5),
+          Offset(cx + math.cos(angle) * 14, cy + math.sin(angle) * 14),
+          i == 0 ? 5 + pulse * 2 : 3 + pulse,
+          Paint()
+            ..color = AppColors.signal.withOpacity(i == 0 ? 1.0 : 0.4)
+            ..style = PaintingStyle.fill,
         );
       }
     } else {
-      // Upload arrow
-      final arrowPaint = Paint()
-        ..color = AppColors.accent
-        ..strokeWidth = 2.5
+      final p = Paint()
+        ..color = AppColors.signal
+        ..strokeWidth = 2
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke;
-
-      canvas.drawLine(Offset(cx, cy + 10), Offset(cx, cy - 10), arrowPaint);
-      canvas.drawLine(Offset(cx - 7, cy - 3), Offset(cx, cy - 10), arrowPaint);
-      canvas.drawLine(Offset(cx + 7, cy - 3), Offset(cx, cy - 10), arrowPaint);
+      canvas.drawLine(Offset(cx, cy + 10), Offset(cx, cy - 10), p);
+      canvas.drawLine(Offset(cx - 7, cy - 3), Offset(cx, cy - 10), p);
+      canvas.drawLine(Offset(cx + 7, cy - 3), Offset(cx, cy - 10), p);
     }
   }
 
   @override
-  bool shouldRepaint(_OrbitPainter old) => true;
+  bool shouldRepaint(_OrbitPainter _) => true;
 }
 
-// ── Success state ─────────────────────────────────────────────────────────────
+/// Fallback for success — animated check circle
+class _SuccessFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: AppColors.greenTrace,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.green.withOpacity(0.3), width: 1),
+        ),
+        child:
+            const Icon(Icons.check_rounded, color: AppColors.green, size: 48),
+      );
+}
 
-class _SuccessView extends ConsumerWidget {
-  final PlatformFile file;
-  const _SuccessView({super.key, required this.file});
+/// Fallback for error — error icon circle
+class _ErrorFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 100,
+        height: 100,
+        decoration: BoxDecoration(
+          color: AppColors.redTrace,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.red.withOpacity(0.3), width: 1),
+        ),
+        child: const Icon(Icons.error_outline_rounded,
+            color: AppColors.red, size: 44),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED TINY WIDGETS
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CornerPainter extends CustomPainter {
+  final Color color;
+  final double thickness;
+  const _CornerPainter({required this.color, required this.thickness});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Lottie.asset(
-            'assets/lottie/upload-success.json',
-            height: 300,
-            repeat: false,
-          ),
-          const SizedBox(height: 32),
-          Text('Document uploaded!', style: AppTextStyles.displayMD)
-              .animate()
-              .fadeIn(delay: 300.ms)
-              .slideY(begin: 0.2, end: 0, curve: Curves.easeOutCubic),
-          const SizedBox(height: 8),
-          Text(
-            'AI is indexing "${file.name.truncate(36)}".\nYou\'ll be able to search it in seconds.',
-            style: AppTextStyles.bodyLG,
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 400.ms),
-          const SizedBox(height: 48),
-          // Processing status indicator
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface0,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    color: AppColors.accent,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Claude is analyzing your document...',
-                  style: AppTextStyles.bodyMD,
-                ),
-              ],
-            ),
-          ).animate().fadeIn(delay: 500.ms),
-          const SizedBox(height: 40),
-          // CTAs
-          GlowButton(
-            onPressed: () {
-              ref.read(uploadNotifierProvider.notifier).reset();
-              context.go(AppRoutes.documents);
-            },
-            child: const Text('View Documents'),
-          ).animate().fadeIn(delay: 600.ms),
-          const SizedBox(height: 14),
-          TextButton(
-            onPressed: () => ref.read(uploadNotifierProvider.notifier).reset(),
-            child: Text(
-              'Upload another',
-              style:
-                  AppTextStyles.bodyMD.copyWith(color: AppColors.textSecondary),
-            ),
-          ).animate().fadeIn(delay: 700.ms),
-        ],
-      ),
-    );
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = thickness
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset.zero, Offset(size.width, 0), p);
+    canvas.drawLine(Offset.zero, Offset(0, size.height), p);
   }
-}
-
-// ── Failed state ──────────────────────────────────────────────────────────────
-
-class _FailedView extends ConsumerWidget {
-  final String error;
-  const _FailedView({super.key, required this.error});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Lottie.asset(
-            'assets/lottie/upload-error.json',
-            height: 300,
-            repeat: false,
-          ),
-          const SizedBox(height: 28),
-          Text('Upload failed', style: AppTextStyles.displayMD)
-              .animate()
-              .fadeIn(delay: 200.ms),
-          const SizedBox(height: 10),
-          Text(error, style: AppTextStyles.bodyLG, textAlign: TextAlign.center)
-              .animate()
-              .fadeIn(delay: 280.ms),
-          const SizedBox(height: 48),
-          GlowButton(
-            onPressed: () =>
-                ref.read(uploadNotifierProvider.notifier).clearError(),
-            color: AppColors.error,
-            child: const Text('Try Again'),
-          ).animate().fadeIn(delay: 360.ms),
-        ],
-      ),
-    );
-  }
+  bool shouldRepaint(_CornerPainter o) =>
+      o.color != color || o.thickness != thickness;
 }
 
-// ── Extensions ────────────────────────────────────────────────────────────────
+class _FormatBadge extends StatelessWidget {
+  final String ext;
+  final IconData icon;
+  final Color color;
+  const _FormatBadge(
+      {required this.ext, required this.icon, required this.color});
 
-extension _StringX on String {
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color.withOpacity(0.2), width: 0.5),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 5),
+          Text(ext, style: AppTextStyles.monoSM.copyWith(color: color)),
+        ]),
+      );
+}
+
+// ── AppRoutes stub (defined in constants/app_theme) ───────────────────────────
+extension on String {
   String truncate(int max) => length <= max ? this : '${substring(0, max)}...';
 }
 
-// Pull AppRoutes in (it's defined in constants)
 class AppRoutes {
   static const documents = '/documents';
 }

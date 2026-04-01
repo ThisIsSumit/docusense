@@ -11,8 +11,6 @@ enum DocumentType { pdf, image, docx, txt, unknown }
 @freezed
 @HiveType(typeId: 1)
 class DocumentModel with _$DocumentModel {
-  const DocumentModel._(); // ✅ REQUIRED for getters
-
   const factory DocumentModel({
     @HiveField(0) required String id,
     @HiveField(1) required String title,
@@ -28,21 +26,11 @@ class DocumentModel with _$DocumentModel {
     @HiveField(11) required DateTime createdAt,
     @HiveField(12) DateTime? processedAt,
     @HiveField(13) DateTime? cachedAt,
-
-    // ✅ IMPORTANT: needed for download feature
-    @HiveField(14) String? storageKey,
   }) = _DocumentModel;
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) =>
       _$DocumentModelFromJson(json);
-
-  // ✅ Safe getter for usage in UI / API
-  String get resolvedStorageKey => storageKey ?? fileName;
 }
-
-// =========================
-// Extensions
-// =========================
 
 extension DocumentModelX on DocumentModel {
   String get displaySize {
@@ -68,13 +56,4 @@ extension DocumentModelX on DocumentModel {
     return DateTime.now().difference(cachedAt!) >
         const Duration(hours: 24);
   }
-
-  // ✅ Useful UI helpers
-  bool get isProcessing =>
-      status == DocumentStatus.pending ||
-      status == DocumentStatus.processing;
-
-  bool get isReady => status == DocumentStatus.ready;
-
-  bool get hasFailed => status == DocumentStatus.failed;
 }

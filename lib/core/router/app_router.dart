@@ -137,12 +137,11 @@ GoRouter appRouter(AppRouterRef ref) {
         pageBuilder: (context, state) =>
             _slideUp(state, const DocumentUploadScreen()),
       ),
-       GoRoute(
+      GoRoute(
         path: AppRoutes.chat,
-        pageBuilder: (context, state) =>
-            _slideUp(state, const ChatScreen()),
+        pageBuilder: (context, state) => _slideUp(state, const ChatScreen()),
       ),
-        GoRoute(
+      GoRoute(
         path: AppRoutes.chatDocument,
         pageBuilder: (context, state) {
           final docId = state.pathParameters['docId']!;

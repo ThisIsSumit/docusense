@@ -4,34 +4,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/dio_client.dart';
 import '../../../../shared/widgets/app_widgets.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState
-    extends ConsumerState<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   bool _isLoading = false;
   bool _sent = false;
+  String? _error;
 
   @override
-  void dispose() {
-    _emailCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _emailCtrl.dispose(); super.dispose(); }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) setState(() { _isLoading = false; _sent = true; });
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      // Real API call — backend sends reset email
+      await ref.read(dioClientProvider).post('/auth/forgot-password', data: {
+        'email': _emailCtrl.text.trim().toLowerCase(),
+      });
+      if (mounted) setState(() { _isLoading = false; _sent = true; });
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = e.message; });
+    } catch (_) {
+      if (mounted) setState(() { _isLoading = false; _error = 'Request failed. Try again.'; });
+    }
   }
 
   @override
@@ -52,6 +58,7 @@ class _ForgotPasswordScreenState
             formKey: _formKey,
             emailCtrl: _emailCtrl,
             isLoading: _isLoading,
+            error: _error,
             onSubmit: _submit,
           ),
         ),
@@ -64,12 +71,14 @@ class _FormView extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController emailCtrl;
   final bool isLoading;
+  final String? error;
   final VoidCallback onSubmit;
 
   const _FormView({
     required this.formKey,
     required this.emailCtrl,
     required this.isLoading,
+    required this.error,
     required this.onSubmit,
   });
 
@@ -84,10 +93,14 @@ class _FormView extends StatelessWidget {
           Text('Reset\npassword.', style: AppTextStyles.displayLG)
               .animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 8),
-          Text('Enter your email and we\'ll send you a reset link.',
+          Text('Enter your email — we\'ll send a reset link.',
               style: AppTextStyles.bodyMD)
               .animate().fadeIn(delay: 80.ms),
-          const SizedBox(height: 48),
+          const SizedBox(height: 40),
+          if (error != null) ...[
+            ErrorBanner(message: error!),
+            const SizedBox(height: 16),
+          ],
           AppTextField(
             label: 'Email',
             hint: 'you@example.com',
@@ -123,30 +136,25 @@ class _SuccessView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 80,
-            height: 80,
+            width: 80, height: 80,
             decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.1),
+              color: AppColors.greenTrace,
               shape: BoxShape.circle,
+              border: Border.all(color: AppColors.green.withOpacity(0.3), width: 1),
             ),
-            child: const Icon(Icons.check_rounded,
-                color: AppColors.success, size: 40),
+            child: const Icon(Icons.check_rounded, color: AppColors.green, size: 36),
           )
               .animate()
-              .scale(
-                begin: const Offset(0.5, 0.5),
-                curve: const Cubic(0.34, 1.56, 0.64, 1),
-              )
+              .scale(begin: const Offset(0.5, 0.5),
+                  curve: const Cubic(0.34, 1.56, 0.64, 1))
               .fadeIn(),
           const SizedBox(height: 24),
           Text('Check your inbox', style: AppTextStyles.headingMD)
-              .animate()
-              .fadeIn(delay: 200.ms),
+              .animate().fadeIn(delay: 200.ms),
           const SizedBox(height: 8),
           Text('We sent a password reset link to your email.',
               style: AppTextStyles.bodyMD, textAlign: TextAlign.center)
-              .animate()
-              .fadeIn(delay: 300.ms),
+              .animate().fadeIn(delay: 300.ms),
           const SizedBox(height: 40),
           TextButton(
             onPressed: () => context.pop(),

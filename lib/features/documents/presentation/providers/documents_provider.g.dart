@@ -21,7 +21,7 @@ final documentCacheBoxProvider = AutoDisposeFutureProvider<Box<Map>>.internal(
 );
 
 typedef DocumentCacheBoxRef = AutoDisposeFutureProviderRef<Box<Map>>;
-String _$documentByIdHash() => r'1a567aad1662f87f097411391c06f794779b4e81';
+String _$documentByIdHash() => r'313c958a9944b4a8f635aa98255c9c5ef3040183';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -171,7 +171,136 @@ class _DocumentByIdProviderElement
   String get id => (origin as DocumentByIdProvider).id;
 }
 
-String _$documentsNotifierHash() => r'780ce39818bf7e727c3a496850b6ff326bf2e117';
+String _$jobStatusStreamHash() => r'410a8e15d7aea8d469beaa5f3e1e46cd7e69619f';
+
+/// See also [jobStatusStream].
+@ProviderFor(jobStatusStream)
+const jobStatusStreamProvider = JobStatusStreamFamily();
+
+/// See also [jobStatusStream].
+class JobStatusStreamFamily extends Family<AsyncValue<JobStatus>> {
+  /// See also [jobStatusStream].
+  const JobStatusStreamFamily();
+
+  /// See also [jobStatusStream].
+  JobStatusStreamProvider call(
+    String jobId,
+  ) {
+    return JobStatusStreamProvider(
+      jobId,
+    );
+  }
+
+  @override
+  JobStatusStreamProvider getProviderOverride(
+    covariant JobStatusStreamProvider provider,
+  ) {
+    return call(
+      provider.jobId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'jobStatusStreamProvider';
+}
+
+/// See also [jobStatusStream].
+class JobStatusStreamProvider extends AutoDisposeStreamProvider<JobStatus> {
+  /// See also [jobStatusStream].
+  JobStatusStreamProvider(
+    String jobId,
+  ) : this._internal(
+          (ref) => jobStatusStream(
+            ref as JobStatusStreamRef,
+            jobId,
+          ),
+          from: jobStatusStreamProvider,
+          name: r'jobStatusStreamProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$jobStatusStreamHash,
+          dependencies: JobStatusStreamFamily._dependencies,
+          allTransitiveDependencies:
+              JobStatusStreamFamily._allTransitiveDependencies,
+          jobId: jobId,
+        );
+
+  JobStatusStreamProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.jobId,
+  }) : super.internal();
+
+  final String jobId;
+
+  @override
+  Override overrideWith(
+    Stream<JobStatus> Function(JobStatusStreamRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: JobStatusStreamProvider._internal(
+        (ref) => create(ref as JobStatusStreamRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        jobId: jobId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<JobStatus> createElement() {
+    return _JobStatusStreamProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is JobStatusStreamProvider && other.jobId == jobId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, jobId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin JobStatusStreamRef on AutoDisposeStreamProviderRef<JobStatus> {
+  /// The parameter `jobId` of this provider.
+  String get jobId;
+}
+
+class _JobStatusStreamProviderElement
+    extends AutoDisposeStreamProviderElement<JobStatus>
+    with JobStatusStreamRef {
+  _JobStatusStreamProviderElement(super.provider);
+
+  @override
+  String get jobId => (origin as JobStatusStreamProvider).jobId;
+}
+
+String _$documentsNotifierHash() => r'f1415b363684c51ccbcc5addb5e6a01774488031';
 
 /// See also [DocumentsNotifier].
 @ProviderFor(DocumentsNotifier)

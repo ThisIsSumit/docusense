@@ -31,14 +31,13 @@ class DocumentModelAdapter extends TypeAdapter<DocumentModel> {
       createdAt: fields[11] as DateTime,
       processedAt: fields[12] as DateTime?,
       cachedAt: fields[13] as DateTime?,
-      storageKey: fields[14] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, DocumentModel obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -66,9 +65,7 @@ class DocumentModelAdapter extends TypeAdapter<DocumentModel> {
       ..writeByte(12)
       ..write(obj.processedAt)
       ..writeByte(13)
-      ..write(obj.cachedAt)
-      ..writeByte(14)
-      ..write(obj.storageKey);
+      ..write(obj.cachedAt);
   }
 
   @override
@@ -116,7 +113,6 @@ _$DocumentModelImpl _$$DocumentModelImplFromJson(Map json) => $checkedCreate(
               (v) => v == null ? null : DateTime.parse(v as String)),
           cachedAt: $checkedConvert('cached_at',
               (v) => v == null ? null : DateTime.parse(v as String)),
-          storageKey: $checkedConvert('storage_key', (v) => v as String?),
         );
         return val;
       },
@@ -129,8 +125,7 @@ _$DocumentModelImpl _$$DocumentModelImplFromJson(Map json) => $checkedCreate(
         'queryCount': 'query_count',
         'createdAt': 'created_at',
         'processedAt': 'processed_at',
-        'cachedAt': 'cached_at',
-        'storageKey': 'storage_key'
+        'cachedAt': 'cached_at'
       },
     );
 
@@ -150,7 +145,6 @@ Map<String, dynamic> _$$DocumentModelImplToJson(_$DocumentModelImpl instance) =>
       'created_at': instance.createdAt.toIso8601String(),
       'processed_at': instance.processedAt?.toIso8601String(),
       'cached_at': instance.cachedAt?.toIso8601String(),
-      'storage_key': instance.storageKey,
     };
 
 const _$DocumentStatusEnumMap = {

@@ -37,7 +37,7 @@ final sharedPrefsProvider =
 );
 
 typedef SharedPrefsRef = AutoDisposeFutureProviderRef<SharedPreferences>;
-String _$authStateNotifierHash() => r'4264a81a3dc8276fd7f90477fbda27a5a1caa3e0';
+String _$authStateNotifierHash() => r'394b70168dcfbc2618861649d98003d514b4ee8a';
 
 /// See also [AuthStateNotifier].
 @ProviderFor(AuthStateNotifier)

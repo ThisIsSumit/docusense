@@ -47,10 +47,7 @@ mixin _$DocumentModel {
   @HiveField(12)
   DateTime? get processedAt => throw _privateConstructorUsedError;
   @HiveField(13)
-  DateTime? get cachedAt =>
-      throw _privateConstructorUsedError; // ✅ IMPORTANT: needed for download feature
-  @HiveField(14)
-  String? get storageKey => throw _privateConstructorUsedError;
+  DateTime? get cachedAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -78,8 +75,7 @@ abstract class $DocumentModelCopyWith<$Res> {
       @HiveField(10) int queryCount,
       @HiveField(11) DateTime createdAt,
       @HiveField(12) DateTime? processedAt,
-      @HiveField(13) DateTime? cachedAt,
-      @HiveField(14) String? storageKey});
+      @HiveField(13) DateTime? cachedAt});
 }
 
 /// @nodoc
@@ -109,7 +105,6 @@ class _$DocumentModelCopyWithImpl<$Res, $Val extends DocumentModel>
     Object? createdAt = null,
     Object? processedAt = freezed,
     Object? cachedAt = freezed,
-    Object? storageKey = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -168,10 +163,6 @@ class _$DocumentModelCopyWithImpl<$Res, $Val extends DocumentModel>
           ? _value.cachedAt
           : cachedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      storageKey: freezed == storageKey
-          ? _value.storageKey
-          : storageKey // ignore: cast_nullable_to_non_nullable
-              as String?,
     ) as $Val);
   }
 }
@@ -198,8 +189,7 @@ abstract class _$$DocumentModelImplCopyWith<$Res>
       @HiveField(10) int queryCount,
       @HiveField(11) DateTime createdAt,
       @HiveField(12) DateTime? processedAt,
-      @HiveField(13) DateTime? cachedAt,
-      @HiveField(14) String? storageKey});
+      @HiveField(13) DateTime? cachedAt});
 }
 
 /// @nodoc
@@ -227,7 +217,6 @@ class __$$DocumentModelImplCopyWithImpl<$Res>
     Object? createdAt = null,
     Object? processedAt = freezed,
     Object? cachedAt = freezed,
-    Object? storageKey = freezed,
   }) {
     return _then(_$DocumentModelImpl(
       id: null == id
@@ -286,17 +275,13 @@ class __$$DocumentModelImplCopyWithImpl<$Res>
           ? _value.cachedAt
           : cachedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      storageKey: freezed == storageKey
-          ? _value.storageKey
-          : storageKey // ignore: cast_nullable_to_non_nullable
-              as String?,
     ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$DocumentModelImpl extends _DocumentModel {
+class _$DocumentModelImpl implements _DocumentModel {
   const _$DocumentModelImpl(
       {@HiveField(0) required this.id,
       @HiveField(1) required this.title,
@@ -311,10 +296,8 @@ class _$DocumentModelImpl extends _DocumentModel {
       @HiveField(10) this.queryCount = 0,
       @HiveField(11) required this.createdAt,
       @HiveField(12) this.processedAt,
-      @HiveField(13) this.cachedAt,
-      @HiveField(14) this.storageKey})
-      : _tags = tags,
-        super._();
+      @HiveField(13) this.cachedAt})
+      : _tags = tags;
 
   factory _$DocumentModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$DocumentModelImplFromJson(json);
@@ -370,14 +353,10 @@ class _$DocumentModelImpl extends _DocumentModel {
   @override
   @HiveField(13)
   final DateTime? cachedAt;
-// ✅ IMPORTANT: needed for download feature
-  @override
-  @HiveField(14)
-  final String? storageKey;
 
   @override
   String toString() {
-    return 'DocumentModel(id: $id, title: $title, fileName: $fileName, mimeType: $mimeType, fileSizeBytes: $fileSizeBytes, status: $status, summary: $summary, thumbnailUrl: $thumbnailUrl, tags: $tags, pageCount: $pageCount, queryCount: $queryCount, createdAt: $createdAt, processedAt: $processedAt, cachedAt: $cachedAt, storageKey: $storageKey)';
+    return 'DocumentModel(id: $id, title: $title, fileName: $fileName, mimeType: $mimeType, fileSizeBytes: $fileSizeBytes, status: $status, summary: $summary, thumbnailUrl: $thumbnailUrl, tags: $tags, pageCount: $pageCount, queryCount: $queryCount, createdAt: $createdAt, processedAt: $processedAt, cachedAt: $cachedAt)';
   }
 
   @override
@@ -407,9 +386,7 @@ class _$DocumentModelImpl extends _DocumentModel {
             (identical(other.processedAt, processedAt) ||
                 other.processedAt == processedAt) &&
             (identical(other.cachedAt, cachedAt) ||
-                other.cachedAt == cachedAt) &&
-            (identical(other.storageKey, storageKey) ||
-                other.storageKey == storageKey));
+                other.cachedAt == cachedAt));
   }
 
   @JsonKey(ignore: true)
@@ -429,8 +406,7 @@ class _$DocumentModelImpl extends _DocumentModel {
       queryCount,
       createdAt,
       processedAt,
-      cachedAt,
-      storageKey);
+      cachedAt);
 
   @JsonKey(ignore: true)
   @override
@@ -446,7 +422,7 @@ class _$DocumentModelImpl extends _DocumentModel {
   }
 }
 
-abstract class _DocumentModel extends DocumentModel {
+abstract class _DocumentModel implements DocumentModel {
   const factory _DocumentModel(
       {@HiveField(0) required final String id,
       @HiveField(1) required final String title,
@@ -461,9 +437,7 @@ abstract class _DocumentModel extends DocumentModel {
       @HiveField(10) final int queryCount,
       @HiveField(11) required final DateTime createdAt,
       @HiveField(12) final DateTime? processedAt,
-      @HiveField(13) final DateTime? cachedAt,
-      @HiveField(14) final String? storageKey}) = _$DocumentModelImpl;
-  const _DocumentModel._() : super._();
+      @HiveField(13) final DateTime? cachedAt}) = _$DocumentModelImpl;
 
   factory _DocumentModel.fromJson(Map<String, dynamic> json) =
       _$DocumentModelImpl.fromJson;
@@ -510,9 +484,6 @@ abstract class _DocumentModel extends DocumentModel {
   @override
   @HiveField(13)
   DateTime? get cachedAt;
-  @override // ✅ IMPORTANT: needed for download feature
-  @HiveField(14)
-  String? get storageKey;
   @override
   @JsonKey(ignore: true)
   _$$DocumentModelImplCopyWith<_$DocumentModelImpl> get copyWith =>

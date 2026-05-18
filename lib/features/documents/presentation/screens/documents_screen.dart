@@ -61,8 +61,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       body: RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.surface1,
-        onRefresh: () =>
-            ref.read(documentsNotifierProvider.notifier).refresh(),
+        onRefresh: () => ref.read(documentsNotifierProvider.notifier).refresh(),
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
@@ -78,9 +77,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('Documents',
-                          style: AppTextStyles.displayMD),
-                      Text('${state.items.length}',
+                      Text('Documents', style: AppTextStyles.displayMD),
+                      Text(
+                          '${state.total > 0 ? state.total : state.items.length}',
                           style: AppTextStyles.monoMD),
                     ],
                   ),
@@ -96,13 +95,25 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    _FilterChip(label: 'All', value: 'all', current: _filter,
+                    _FilterChip(
+                        label: 'All',
+                        value: 'all',
+                        current: _filter,
                         onTap: (v) => setState(() => _filter = v)),
-                    _FilterChip(label: 'PDF', value: 'pdf', current: _filter,
+                    _FilterChip(
+                        label: 'PDF',
+                        value: 'pdf',
+                        current: _filter,
                         onTap: (v) => setState(() => _filter = v)),
-                    _FilterChip(label: 'Images', value: 'image', current: _filter,
+                    _FilterChip(
+                        label: 'Images',
+                        value: 'image',
+                        current: _filter,
                         onTap: (v) => setState(() => _filter = v)),
-                    _FilterChip(label: 'Processing', value: 'processing', current: _filter,
+                    _FilterChip(
+                        label: 'Processing',
+                        value: 'processing',
+                        current: _filter,
                         onTap: (v) => setState(() => _filter = v)),
                   ],
                 ),
@@ -186,8 +197,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
                       )
                           .animate()
                           .fadeIn(
-                            delay: Duration(
-                                milliseconds: 50 * (i % 10)),
+                            delay: Duration(milliseconds: 50 * (i % 10)),
                           )
                           .slideX(
                             begin: 0.04,
@@ -241,7 +251,8 @@ class _FilterChip extends StatelessWidget {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? AppColors.accent.withOpacity(0.12) : AppColors.surface0,
+          color:
+              active ? AppColors.accent.withOpacity(0.12) : AppColors.surface0,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: active ? AppColors.accent : AppColors.border,
@@ -326,13 +337,11 @@ class _DocumentListTile extends StatelessWidget {
                         const Text('·',
                             style: TextStyle(color: AppColors.textTertiary)),
                         const SizedBox(width: 6),
-                        Text('${doc.pageCount}p',
-                            style: AppTextStyles.bodySM),
+                        Text('${doc.pageCount}p', style: AppTextStyles.bodySM),
                         if (doc.tags.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           const Text('·',
-                              style:
-                                  TextStyle(color: AppColors.textTertiary)),
+                              style: TextStyle(color: AppColors.textTertiary)),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
@@ -397,14 +406,15 @@ class _DocumentListTileSkeleton extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ShimmerBox(width: 40, height: 40, borderRadius: BorderRadius.circular(8)),
+          ShimmerBox(
+              width: 40, height: 40, borderRadius: BorderRadius.circular(8)),
           const SizedBox(width: 14),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ShimmerBox(width: double.infinity, height: 13),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 ShimmerBox(width: 100, height: 10),
               ],
             ),

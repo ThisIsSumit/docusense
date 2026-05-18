@@ -131,6 +131,10 @@ class UploadNotifier extends _$UploadNotifier {
             },
           );
 
+      ref
+          .read(documentsNotifierProvider.notifier)
+          .upsertDocument(result.document);
+
       state = state.copyWith(
         phase: UploadPhase.processing,
         progress: 0.62,
@@ -138,30 +142,40 @@ class UploadNotifier extends _$UploadNotifier {
         processingStep: 'Extracting text content...',
       );
 
-      await for (final job in ref
-          .read(documentsRemoteDatasourceProvider)
-          .pollJobUntilDone(result.jobId)) {
-        final display = 0.62 + job.progressFraction * 0.36;
-        state = state.copyWith(
-          progress: display,
-          processingStep: _stepLabel(job.progressFraction),
-          pollProgress: job.progress.toInt(),
-        );
+      try {
+        await for (final job in ref
+            .read(documentsRemoteDatasourceProvider)
+            .pollJobUntilDone(result.jobId)) {
+          final display = 0.62 + job.progressFraction * 0.36;
+          state = state.copyWith(
+            progress: display,
+            processingStep: _stepLabel(job.progressFraction),
+            pollProgress: job.progress.toInt(),
+          );
 
-        if (job.isCompleted) {
-          ref.invalidate(documentsNotifierProvider);
-          state = state.copyWith(
-              phase: UploadPhase.success,
-              progress: 1.0,
-              processingStep: 'Ready to search');
-          return;
+          if (job.isCompleted) {
+            ref.invalidate(documentsNotifierProvider);
+            state = state.copyWith(
+                phase: UploadPhase.success,
+                progress: 1.0,
+                processingStep: 'Ready to search');
+            return;
+          }
+          if (job.isFailed) {
+            state = state.copyWith(
+                phase: UploadPhase.failed,
+                error: job.failedReason ?? 'Processing failed');
+            return;
+          }
         }
-        if (job.isFailed) {
-          state = state.copyWith(
-              phase: UploadPhase.failed,
-              error: job.failedReason ?? 'Processing failed');
-          return;
-        }
+      } catch (_) {
+        ref.invalidate(documentsNotifierProvider);
+        state = state.copyWith(
+          phase: UploadPhase.success,
+          progress: 1.0,
+          processingStep: 'Queued for processing',
+        );
+        return;
       }
     } on ApiException catch (e) {
       state = state.copyWith(
@@ -406,14 +420,12 @@ class _LottieOrFallback extends StatelessWidget {
   final double height;
   final bool repeat;
   final Widget fallback;
-  final VoidCallback? onLoaded;
 
   const _LottieOrFallback({
     required this.assetPath,
     required this.height,
     required this.repeat,
     required this.fallback,
-    this.onLoaded,
   });
 
   @override
@@ -423,7 +435,6 @@ class _LottieOrFallback extends StatelessWidget {
       height: height,
       repeat: repeat,
       fallback: fallback,
-      onLoaded: onLoaded,
     );
   }
 }
@@ -434,14 +445,12 @@ class _LottieAssetChecker extends StatefulWidget {
   final double height;
   final bool repeat;
   final Widget fallback;
-  final VoidCallback? onLoaded;
 
   const _LottieAssetChecker({
     required this.assetPath,
     required this.height,
     required this.repeat,
     required this.fallback,
-    this.onLoaded,
   });
 
   @override

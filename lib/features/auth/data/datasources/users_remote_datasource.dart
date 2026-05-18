@@ -3,13 +3,22 @@ import 'package:docusense/core/utils/dio_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-
-
 part 'users_remote_datasource.g.dart';
 
 @riverpod
 UsersRemoteDatasource usersRemoteDatasource(Ref ref) {
   return UsersRemoteDatasource(dio: ref.watch(dioClientProvider));
+}
+
+// Note: keep only helpers actually used by this datasource.
+
+Map<String, dynamic> _unwrapData(dynamic payload) {
+  if (payload is Map) {
+    final data = payload['data'];
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return Map<String, dynamic>.from(payload);
+  }
+  throw const FormatException('Invalid users response');
 }
 
 class UserStats {
@@ -27,42 +36,58 @@ class UserStats {
     required this.recentQueries,
   });
 
-  factory UserStats.fromJson(Map<String, dynamic> json) => UserStats(
-        documentsCount: json['documentsCount'] as int? ?? 0,
-        queriesCount: json['queriesCount'] as int? ?? 0,
-        memberSince: DateTime.parse(json['memberSince'] as String),
-        documentsByStatus: Map<String, int>.from(
-          (json['documentsByStatus'] as Map<String, dynamic>? ?? {})
-              .map((k, v) => MapEntry(k, v as int)),
-        ),
-        recentQueries: (json['recentQueries'] as List? ?? [])
-            .map((q) => RecentQuery.fromJson(q as Map<String, dynamic>))
-            .toList(),
-      );
+  factory UserStats.fromJson(Map<String, dynamic> json) {
+    return UserStats(
+      documentsCount: json['documentsCount'] as int,
+      queriesCount: json['queriesCount'] as int,
+      memberSince: DateTime.parse(json['memberSince'] as String),
+      documentsByStatus: Map<String, int>.from(
+        json['documentsByStatus'] as Map<String, dynamic>,
+      ),
+      recentQueries: (json['recentQueries'] as List)
+          .map((e) => RecentQuery.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 class RecentQuery {
   final String id;
   final String question;
   final DateTime createdAt;
-  final ({String id, String title})? document;
+  final QueryDocument document;
 
   const RecentQuery({
     required this.id,
     required this.question,
     required this.createdAt,
-    this.document,
+    required this.document,
   });
 
   factory RecentQuery.fromJson(Map<String, dynamic> json) {
-    final doc = json['document'] as Map<String, dynamic>?;
     return RecentQuery(
       id: json['id'] as String,
       question: json['question'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      document: doc != null
-          ? (id: doc['id'] as String, title: doc['title'] as String)
-          : null,
+      document:
+          QueryDocument.fromJson(json['document'] as Map<String, dynamic>),
+    );
+  }
+}
+
+class QueryDocument {
+  final String id;
+  final String title;
+
+  const QueryDocument({
+    required this.id,
+    required this.title,
+  });
+
+  factory QueryDocument.fromJson(Map<String, dynamic> json) {
+    return QueryDocument(
+      id: json['id'] as String,
+      title: json['title'] as String,
     );
   }
 }
@@ -74,7 +99,7 @@ class UsersRemoteDatasource {
   Future<UserStats> getStats() async {
     try {
       final res = await _dio.get('/users/me/stats');
-      return UserStats.fromJson(res.data['data'] as Map<String, dynamic>);
+      return UserStats.fromJson(_unwrapData(res.data));
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

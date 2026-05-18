@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../theme/app_theme.dart';
-
 part 'dio_client.g.dart';
 
 // ── Token storage ─────────────────────────────────────────────────────────────
@@ -60,10 +58,10 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   Future<void> onRequest(
-    RequestOptions options, RequestInterceptorHandler handler) async {
-    final skip = options.path.contains('/auth/login')
-        || options.path.contains('/auth/register')
-        || options.path.contains('/auth/refresh');
+      RequestOptions options, RequestInterceptorHandler handler) async {
+    final skip = options.path.contains('/auth/login') ||
+        options.path.contains('/auth/register') ||
+        options.path.contains('/auth/refresh');
     if (!skip) {
       final token = await storage.read(key: AppConstants.accessTokenKey);
       if (token != null) {
@@ -75,13 +73,15 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   Future<void> onError(
-    DioException err, ErrorInterceptorHandler handler) async {
-    if (err.response?.statusCode != 401
-        || err.requestOptions.path.contains('/auth/refresh')) {
-      handler.next(err); return;
+      DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode != 401 ||
+        err.requestOptions.path.contains('/auth/refresh')) {
+      handler.next(err);
+      return;
     }
     if (_refreshing) {
-      _queue.add((opts: err.requestOptions, handler: handler)); return;
+      _queue.add((opts: err.requestOptions, handler: handler));
+      return;
     }
     _refreshing = true;
     try {
@@ -104,8 +104,11 @@ class _AuthInterceptor extends Interceptor {
 
       for (final p in _queue) {
         p.opts.headers['Authorization'] = 'Bearer $at';
-        try { p.handler.resolve(await dio.fetch(p.opts)); }
-        catch (_) { p.handler.next(err); }
+        try {
+          p.handler.resolve(await dio.fetch(p.opts));
+        } catch (_) {
+          p.handler.next(err);
+        }
       }
     } catch (_) {
       await storage.delete(key: AppConstants.accessTokenKey);
@@ -128,7 +131,10 @@ class ApiException implements Exception {
   final dynamic details;
 
   const ApiException({
-    this.statusCode, required this.message, this.code, this.details,
+    this.statusCode,
+    required this.message,
+    this.code,
+    this.details,
   });
 
   factory ApiException.fromDio(DioException e) {
@@ -136,30 +142,80 @@ class ApiException implements Exception {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
-        return const ApiException(message: 'Connection timed out', code: 'TIMEOUT');
+        return const ApiException(
+            message: 'Connection timed out', code: 'TIMEOUT');
       case DioExceptionType.connectionError:
-        return const ApiException(message: 'Cannot reach server', code: 'OFFLINE');
+        return const ApiException(
+            message: 'Cannot reach server', code: 'OFFLINE');
       case DioExceptionType.badResponse:
         final s = e.response?.statusCode;
         final b = e.response?.data;
-        final msg = (b is Map) ? (b['error']?['message'] as String? ?? 'Server error') : 'Server error';
-        final code = (b is Map) ? (b['error']?['code'] as String?) : null;
+        String extractMessage(dynamic body) {
+          if (body is Map) {
+            final error = body['error'];
+            if (error is Map) {
+              final nestedMessage = error['message'];
+              if (nestedMessage is String && nestedMessage.isNotEmpty) {
+                return nestedMessage;
+              }
+            }
+
+            final directMessage = body['message'];
+            if (directMessage is String && directMessage.isNotEmpty) {
+              return directMessage;
+            }
+
+            final directError = body['error'];
+            if (directError is String && directError.isNotEmpty) {
+              return directError;
+            }
+          }
+
+          if (body is String && body.isNotEmpty) {
+            return body;
+          }
+
+          return 'Server error';
+        }
+
+        String? extractCode(dynamic body) {
+          if (body is Map) {
+            final error = body['error'];
+            if (error is Map) {
+              final nestedCode = error['code'];
+              if (nestedCode is String && nestedCode.isNotEmpty) {
+                return nestedCode;
+              }
+            }
+
+            final directCode = body['code'];
+            if (directCode is String && directCode.isNotEmpty) {
+              return directCode;
+            }
+          }
+
+          return null;
+        }
+
         return ApiException(
           statusCode: s,
-          message: msg,
-          code: code,
-          details: (b is Map) ? b['error']?['details'] : null: null,
+          message: extractMessage(b),
+          code: extractCode(b),
+          details: b is Map
+              ? (b['error'] is Map ? b['error']['details'] : b['details'])
+              : null,
         );
       default:
-        return ApiException(message: e.message ?? 'Unknown error', code: 'UNKNOWN');
+        return ApiException(
+            message: e.message ?? 'Unknown error', code: 'UNKNOWN');
     }
   }
 
-  bool get isUnauthorized  => statusCode == 401;
-  bool get isForbidden     => statusCode == 403;
-  bool get isNotFound      => statusCode == 404;
-  bool get isConflict      => statusCode == 409;
-  bool get isServerError   => (statusCode ?? 0) >= 500;
+  bool get isUnauthorized => statusCode == 401;
+  bool get isForbidden => statusCode == 403;
+  bool get isNotFound => statusCode == 404;
+  bool get isConflict => statusCode == 409;
+  bool get isServerError => (statusCode ?? 0) >= 500;
 
   @override
   String toString() => 'ApiException($statusCode/$code): $message';

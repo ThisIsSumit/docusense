@@ -10,7 +10,6 @@ import 'package:docusense/features/documents/data/models/document_model.dart';
 part 'documents_remote_datasource.g.dart';
 
 @riverpod
-
 DocumentsRemoteDatasource documentsRemoteDatasource(Ref ref) {
   return DocumentsRemoteDatasource(dio: ref.watch(dioClientProvider));
 }
@@ -18,6 +17,67 @@ DocumentsRemoteDatasource documentsRemoteDatasource(Ref ref) {
 class DocumentsRemoteDatasource {
   final Dio _dio;
   DocumentsRemoteDatasource({required Dio dio}) : _dio = dio;
+
+  Map<String, dynamic> _asMap(dynamic value,
+      {String error = 'Invalid documents response'}) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    throw FormatException(error);
+  }
+
+  Map<String, dynamic> _unwrapData(dynamic payload) {
+    final json = _asMap(payload);
+
+    // Try 'data' key first
+    final data = json['data'];
+    if (data is Map) return Map<String, dynamic>.from(data);
+
+    // Then try 'payload' key
+    final payloadData = json['payload'];
+    if (payloadData is Map) return Map<String, dynamic>.from(payloadData);
+
+    return json;
+  }
+
+  String _stringValue(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is String && value.isNotEmpty) {
+        return value;
+      }
+      if (value is num) {
+        return value.toString();
+      }
+    }
+    throw const FormatException('Missing documents field');
+  }
+
+  int _intValue(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) return parsed;
+      }
+    }
+    return 0;
+  }
+
+  bool _boolValue(Map<String, dynamic> json, List<String> keys,
+      {required bool fallback}) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final normalized = value.toLowerCase();
+        if (normalized == 'true') return true;
+        if (normalized == 'false') return false;
+      }
+    }
+    return fallback;
+  }
 
   // ── Upload (multipart) ────────────────────────────────────────────────────
 
@@ -47,11 +107,13 @@ class DocumentsRemoteDatasource {
         onSendProgress: onProgress,
       );
 
-      final data = res.data['data'] as Map<String, dynamic>;
+      final data = _unwrapData(res.data);
+      final documentJson = data['document'] is Map
+          ? Map<String, dynamic>.from(data['document'] as Map)
+          : data;
       return (
-        document:
-            DocumentModel.fromJson(data['document'] as Map<String, dynamic>),
-        jobId: data['jobId'] as String,
+        document: DocumentModel.fromJson(documentJson),
+        jobId: _stringValue(data, ['jobId', 'job_id']),
       );
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -75,14 +137,15 @@ class DocumentsRemoteDatasource {
         if (search != null && search.isNotEmpty) 'search': search,
         if (tag != null) 'tag': tag,
       });
-      final data = res.data['data'] as Map<String, dynamic>;
-      final items = (data['items'] as List)
-          .map((j) => DocumentModel.fromJson(j as Map<String, dynamic>))
+      final data = _unwrapData(res.data);
+      final items = ((data['items'] as List?) ?? const [])
+          .map((j) => DocumentModel.fromJson(_asMap(j)))
           .toList();
       return (
         items: items,
-        total: data['total'] as int,
-        hasMore: data['hasMore'] as bool,
+        total: _intValue(data, ['total', 'itemsCount', 'items_count']),
+        hasMore: _boolValue(data, ['hasMore', 'has_more'],
+            fallback: items.isNotEmpty && items.length >= limit),
       );
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -94,7 +157,8 @@ class DocumentsRemoteDatasource {
   Future<DocumentModel> getById(String id) async {
     try {
       final res = await _dio.get('/documents/$id');
-      return DocumentModel.fromJson(res.data['data'] as Map<String, dynamic>);
+      final data = _unwrapData(res.data);
+      return DocumentModel.fromJson(data);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -109,7 +173,8 @@ class DocumentsRemoteDatasource {
         if (title != null) 'title': title,
         if (tags != null) 'tags': tags,
       });
-      return DocumentModel.fromJson(res.data['data'] as Map<String, dynamic>);
+      final data = _unwrapData(res.data);
+      return DocumentModel.fromJson(data);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -130,7 +195,7 @@ class DocumentsRemoteDatasource {
   Future<JobStatus> getJobStatus(String jobId) async {
     try {
       final res = await _dio.get('/documents/jobs/$jobId/status');
-      final data = res.data['data'] as Map<String, dynamic>;
+      final data = _unwrapData(res.data);
       return JobStatus.fromJson(data);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
@@ -163,28 +228,14 @@ class DocumentsRemoteDatasource {
   Future<String> reprocess(String id) async {
     try {
       final res = await _dio.post('/documents/$id/reprocess');
-      return res.data['data']['jobId'] as String;
+      final data = _unwrapData(res.data);
+      return _stringValue(data, ['jobId', 'job_id']);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
   }
 
   // ── Helper ────────────────────────────────────────────────────────────────
-
-  String _mimeType(PlatformFile file) {
-    final ext = file.extension?.toLowerCase() ?? '';
-    const map = {
-      'pdf': 'application/pdf',
-      'png': 'image/png',
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'webp': 'image/webp',
-      'txt': 'text/plain',
-      'docx':
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    };
-    return map[ext] ?? 'application/octet-stream';
-  }
 }
 
 // ── JobStatus model ───────────────────────────────────────────────────────────

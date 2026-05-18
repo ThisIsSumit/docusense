@@ -1,6 +1,6 @@
 abstract class AppConstants {
   // API
-  static const baseUrl = 'https://api.docusense.app/v1';
+  static const baseUrl = 'http://172.17.50.164:3000/api/v1';
   static const connectTimeout = Duration(seconds: 30);
   static const receiveTimeout = Duration(seconds: 60);
 
@@ -30,7 +30,14 @@ abstract class AppConstants {
 
   // Storage
   static const maxFileSizeMB = 50;
-  static const supportedExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'txt'];
+  static const supportedExtensions = [
+    'pdf',
+    'png',
+    'jpg',
+    'jpeg',
+    'docx',
+    'txt'
+  ];
 }
 
 abstract class AppRoutes {
@@ -44,7 +51,7 @@ abstract class AppRoutes {
   static const documentDetail = '/documents/:id';
   static const search = '/search';
   static const chat = '/chat';
-  static const chatDocument   = '/chat/:docId';
+  static const chatDocument = '/chat/:docId';
   static const profile = '/profile';
   static const settings = '/settings';
   static const upload = '/upload';

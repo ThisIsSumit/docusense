@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'package:docusense/core/constants/app_constants.dart';
-import 'package:docusense/features/documents/presentation/providers/documents_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:docusense/features/documents/data/models/document_model.dart';
 import 'package:docusense/features/documents/data/datasources/documents_remote_datasource.dart';
-import 'package:docusense/features/documents/data/datasources/search_remote_datasource.dart';
-import 'package:docusense/core/theme/app_theme.dart';
 import 'package:docusense/core/utils/dio_client.dart';
 
 part 'documents_provider.g.dart';
@@ -20,6 +17,7 @@ Future<Box<Map>> documentCacheBox(DocumentCacheBoxRef ref) async {
 
 class DocumentsState {
   final List<DocumentModel> items;
+  final int total;
   final bool isLoading;
   final bool isLoadingMore;
   final bool hasMore;
@@ -28,6 +26,7 @@ class DocumentsState {
 
   const DocumentsState({
     this.items = const [],
+    this.total = 0,
     this.isLoading = false,
     this.isLoadingMore = false,
     this.hasMore = true,
@@ -37,6 +36,7 @@ class DocumentsState {
 
   DocumentsState copyWith({
     List<DocumentModel>? items,
+    int? total,
     bool? isLoading,
     bool? isLoadingMore,
     bool? hasMore,
@@ -46,6 +46,7 @@ class DocumentsState {
   }) =>
       DocumentsState(
         items: items ?? this.items,
+        total: total ?? this.total,
         isLoading: isLoading ?? this.isLoading,
         isLoadingMore: isLoadingMore ?? this.isLoadingMore,
         hasMore: hasMore ?? this.hasMore,
@@ -108,12 +109,14 @@ class DocumentsNotifier extends _$DocumentsNotifier {
       if (initial || page == 1) {
         state = DocumentsState(
             items: result.items,
+            total: result.total,
             isLoading: false,
             hasMore: result.hasMore,
             currentPage: 1);
       } else {
         state = state.copyWith(
             items: [...state.items, ...result.items],
+            total: result.total,
             isLoadingMore: false,
             hasMore: result.hasMore,
             currentPage: page);
@@ -136,7 +139,8 @@ class DocumentsNotifier extends _$DocumentsNotifier {
           .list(page: 1, limit: AppConstants.pageSize);
       await _saveToCache(r.items);
       if (state.currentPage <= 1) {
-        state = state.copyWith(items: r.items, hasMore: r.hasMore);
+        state =
+            state.copyWith(items: r.items, total: r.total, hasMore: r.hasMore);
       }
     } catch (_) {}
   }
@@ -155,8 +159,27 @@ class DocumentsNotifier extends _$DocumentsNotifier {
   Future<void> deleteDocument(String id) async {
     await ref.read(documentsRemoteDatasourceProvider).delete(id);
     await _removeFromCache(id);
-    state =
-        state.copyWith(items: state.items.where((d) => d.id != id).toList());
+    state = state.copyWith(
+        items: state.items.where((d) => d.id != id).toList(),
+        total: state.total > 0 ? state.total - 1 : 0);
+  }
+
+  Future<void> upsertDocument(DocumentModel document) async {
+    final box = await ref.read(documentCacheBoxRef.future);
+    await box.put(document.id, document.toJson());
+
+    final existingIndex = state.items.indexWhere((d) => d.id == document.id);
+    final updatedItems = existingIndex >= 0
+        ? [
+            document,
+            ...state.items.where((d) => d.id != document.id),
+          ]
+        : [document, ...state.items];
+
+    state = state.copyWith(
+      items: updatedItems,
+      total: existingIndex >= 0 ? state.total : state.total + 1,
+    );
   }
 
   Future<void> updateDocument(String id,

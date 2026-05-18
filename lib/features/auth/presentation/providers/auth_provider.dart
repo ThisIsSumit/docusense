@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/models/auth_models.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/dio_client.dart';
 
 part 'auth_provider.g.dart';
@@ -134,6 +133,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
 
   Future<bool> login({required String email, required String password}) async {
     final cur = state.valueOrNull ?? const AuthState();
+    if (cur.isLoading) return false;
     state = AsyncData(cur.copyWith(isLoading: true, clearError: true));
     try {
       final res = await ref
@@ -164,6 +164,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       required String email,
       required String password}) async {
     final cur = state.valueOrNull ?? const AuthState();
+    if (cur.isLoading) return false;
     state = AsyncData(cur.copyWith(isLoading: true, clearError: true));
     try {
       final res = await ref

@@ -66,12 +66,21 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.1
   build_runner: ^2.4.9
+  flutter_launcher_icons: ^0.14.4
   riverpod_generator: ^2.4.0
   freezed: ^2.5.2
   json_serializable: ^6.8.0
   hive_generator: ^2.0.1
   custom_lint: ^0.6.4
   riverpod_lint: ^2.3.10
+
+flutter_launcher_icons:
+  android: true
+  adaptive_icon_foreground: assets/images/docusense_log.png
+  adaptive_icon_background: "#FFFFFF"
+  ios: true
+  remove_alpha_ios: true
+  image_path: assets/images/docusense_log.png
 
 flutter:
   uses-material-design: true

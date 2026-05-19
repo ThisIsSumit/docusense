@@ -90,12 +90,12 @@ class HomeScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Recent Documents',
-                      style: AppTextStyles.headingSM),
+                      style: AppTextStyles.headingSM,),
                   TextButton(
                     onPressed: () => context.go(AppRoutes.documents),
                     child: Text('View all',
                         style: AppTextStyles.bodyMD
-                            .copyWith(color: AppColors.accent)),
+                            .copyWith(color: AppColors.accent),),
                   ),
                 ],
               ).animate().fadeIn(delay: 300.ms),
@@ -179,7 +179,7 @@ class _StatsRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
+        const Expanded(
           child: _StatCard(
             value: '2.4GB',
             label: 'Storage',
@@ -220,7 +220,7 @@ class _StatCard extends StatelessWidget {
           Icon(icon, color: color, size: 18),
           const SizedBox(height: 10),
           Text(value,
-              style: AppTextStyles.headingMD.copyWith(color: color)),
+              style: AppTextStyles.headingMD.copyWith(color: color),),
           const SizedBox(height: 2),
           Text(label, style: AppTextStyles.bodySM),
         ],
@@ -258,6 +258,7 @@ class _DocCard extends ConsumerWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
+                //ignore: deprecated_member_use
                 color: typeColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -281,7 +282,7 @@ class _DocCard extends ConsumerWidget {
                   Row(
                     children: [
                       Text(doc.displaySize,
-                          style: AppTextStyles.bodySM),
+                          style: AppTextStyles.bodySM,),
                       const SizedBox(width: 8),
                       Container(
                         width: 3,
@@ -354,10 +355,10 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (status == DocumentStatus.ready) {
       return const Icon(Icons.check_circle_outline_rounded,
-          color: AppColors.success, size: 18);
+          color: AppColors.success, size: 18,);
     }
     if (status == DocumentStatus.processing) {
-      return SizedBox(
+      return const SizedBox(
         width: 16,
         height: 16,
         child: CircularProgressIndicator(
@@ -368,7 +369,7 @@ class _StatusBadge extends StatelessWidget {
     }
     if (status == DocumentStatus.failed) {
       return const Icon(Icons.error_outline_rounded,
-          color: AppColors.error, size: 18);
+          color: AppColors.error, size: 18,);
     }
     return const SizedBox.shrink();
   }
@@ -388,12 +389,12 @@ class _DocCardSkeleton extends StatelessWidget {
         children: [
           ShimmerBox(width: 44, height: 44, borderRadius: BorderRadius.circular(10)),
           const SizedBox(width: 14),
-          Expanded(
+        const   Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ShimmerBox(width: double.infinity, height: 14),
-                const SizedBox(height: 8),
+                 SizedBox(height: 8),
                 ShimmerBox(width: 120, height: 10),
               ],
             ),

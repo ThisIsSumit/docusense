@@ -7,8 +7,13 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/data/datasources/users_remote_datasource.dart';
 import '../../../documents/presentation/providers/documents_provider.dart';
 import '../../../documents/data/models/document_model.dart';
+
+final homeUserStatsProvider = FutureProvider<UserStats>((ref) {
+  return ref.read(usersRemoteDatasourceProvider).getStats();
+});
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,6 +21,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateNotifierProvider).valueOrNull?.user;
+    final statsAsync = ref.watch(homeUserStatsProvider);
     final docsState = ref.watch(documentsNotifierProvider);
 
     return Scaffold(
@@ -75,10 +81,24 @@ class HomeScreen extends ConsumerWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: _StatsRow(
-                docs: user?.documentsCount ?? 0,
-                queries: user?.queriesCount ?? 0,
-              ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.1, end: 0),
+              child: statsAsync
+                  .when(
+                    loading: () => const _StatsRow(
+                      docs: 0,
+                      queries: 0,
+                    ),
+                    error: (_, __) => _StatsRow(
+                      docs: user?.documentsCount ?? 0,
+                      queries: user?.queriesCount ?? 0,
+                    ),
+                    data: (stats) => _StatsRow(
+                      docs: stats.documentsCount,
+                      queries: stats.queriesCount,
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(delay: 250.ms)
+                  .slideY(begin: 0.1, end: 0),
             ),
           ),
 
@@ -89,13 +109,17 @@ class HomeScreen extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Recent Documents',
-                      style: AppTextStyles.headingSM,),
+                  Text(
+                    'Recent Documents',
+                    style: AppTextStyles.headingSM,
+                  ),
                   TextButton(
                     onPressed: () => context.go(AppRoutes.documents),
-                    child: Text('View all',
-                        style: AppTextStyles.bodyMD
-                            .copyWith(color: AppColors.accent),),
+                    child: Text(
+                      'View all',
+                      style: AppTextStyles.bodyMD
+                          .copyWith(color: AppColors.accent),
+                    ),
                   ),
                 ],
               ).animate().fadeIn(delay: 300.ms),
@@ -219,8 +243,10 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 18),
           const SizedBox(height: 10),
-          Text(value,
-              style: AppTextStyles.headingMD.copyWith(color: color),),
+          Text(
+            value,
+            style: AppTextStyles.headingMD.copyWith(color: color),
+          ),
           const SizedBox(height: 2),
           Text(label, style: AppTextStyles.bodySM),
         ],
@@ -281,8 +307,10 @@ class _DocCard extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(doc.displaySize,
-                          style: AppTextStyles.bodySM,),
+                      Text(
+                        doc.displaySize,
+                        style: AppTextStyles.bodySM,
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         width: 3,
@@ -354,8 +382,11 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (status == DocumentStatus.ready) {
-      return const Icon(Icons.check_circle_outline_rounded,
-          color: AppColors.success, size: 18,);
+      return const Icon(
+        Icons.check_circle_outline_rounded,
+        color: AppColors.success,
+        size: 18,
+      );
     }
     if (status == DocumentStatus.processing) {
       return const SizedBox(
@@ -368,8 +399,11 @@ class _StatusBadge extends StatelessWidget {
       );
     }
     if (status == DocumentStatus.failed) {
-      return const Icon(Icons.error_outline_rounded,
-          color: AppColors.error, size: 18,);
+      return const Icon(
+        Icons.error_outline_rounded,
+        color: AppColors.error,
+        size: 18,
+      );
     }
     return const SizedBox.shrink();
   }
@@ -387,14 +421,15 @@ class _DocCardSkeleton extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ShimmerBox(width: 44, height: 44, borderRadius: BorderRadius.circular(10)),
+          ShimmerBox(
+              width: 44, height: 44, borderRadius: BorderRadius.circular(10)),
           const SizedBox(width: 14),
-        const   Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ShimmerBox(width: double.infinity, height: 14),
-                 SizedBox(height: 8),
+                SizedBox(height: 8),
                 ShimmerBox(width: 120, height: 10),
               ],
             ),

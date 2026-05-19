@@ -245,10 +245,9 @@ class DocumentUploadScreen extends ConsumerWidget {
             UploadPhase.idle => _IdleView(key: const ValueKey('idle')),
             UploadPhase.picked =>
               _PickedView(key: const ValueKey('picked'), file: upload.file!),
-            UploadPhase.uploading ||
-            UploadPhase.processing =>
+            UploadPhase.uploading =>
               _ProgressView(key: const ValueKey('progress'), upload: upload),
-            UploadPhase.success =>
+            UploadPhase.processing || UploadPhase.success =>
               _SuccessView(key: const ValueKey('success'), file: upload.file!),
             UploadPhase.failed => _FailedView(
                 key: const ValueKey('failed'),

@@ -44,6 +44,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(documentsNotifierProvider);
+    print(
+        'DocumentsScreen rebuild: ${state.items.length} items, isLoading: ${state.isLoading}, total: ${state.total}');
+    print(state.items);
 
     final filtered = _filter == 'all'
         ? state.items

@@ -8,6 +8,28 @@ enum DocumentStatus { pending, processing, ready, failed }
 
 enum DocumentType { pdf, image, docx, txt, unknown }
 
+Map<String, dynamic> _normalizeDocumentJson(Map<String, dynamic> json) {
+  final normalized = Map<String, dynamic>.from(json);
+
+  void copyIfMissing(String snakeKey, String camelKey) {
+    if (!normalized.containsKey(snakeKey) && normalized.containsKey(camelKey)) {
+      normalized[snakeKey] = normalized[camelKey];
+    }
+  }
+
+  copyIfMissing('file_name', 'fileName');
+  copyIfMissing('mime_type', 'mimeType');
+  copyIfMissing('file_size_bytes', 'fileSizeBytes');
+  copyIfMissing('thumbnail_url', 'thumbnailUrl');
+  copyIfMissing('page_count', 'pageCount');
+  copyIfMissing('query_count', 'queryCount');
+  copyIfMissing('created_at', 'createdAt');
+  copyIfMissing('processed_at', 'processedAt');
+  copyIfMissing('cached_at', 'cachedAt');
+
+  return normalized;
+}
+
 @freezed
 @HiveType(typeId: 1)
 class DocumentModel with _$DocumentModel {
@@ -29,7 +51,7 @@ class DocumentModel with _$DocumentModel {
   }) = _DocumentModel;
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) =>
-      _$DocumentModelFromJson(json);
+      _$DocumentModelFromJson(_normalizeDocumentJson(json));
 }
 
 extension DocumentModelX on DocumentModel {
@@ -53,7 +75,6 @@ extension DocumentModelX on DocumentModel {
 
   bool get isStale {
     if (cachedAt == null) return true;
-    return DateTime.now().difference(cachedAt!) >
-        const Duration(hours: 24);
+    return DateTime.now().difference(cachedAt!) > const Duration(hours: 24);
   }
 }

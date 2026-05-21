@@ -314,6 +314,41 @@ Future<void> _saveFileToDevice(
   WidgetRef ref,
   DocumentModel doc,
 ) async {
+  if (!ctx.mounted) return;
+  final messenger = ScaffoldMessenger.of(ctx);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      backgroundColor: AppColors.surface1,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(days: 1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: AppColors.wire, width: 0.5),
+      ),
+      content: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.7,
+              color: AppColors.signal,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Downloading ${doc.fileName}...',
+              style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
   try {
     final fileData =
         await ref.read(documentsRemoteDatasourceProvider).downloadFile(
@@ -331,8 +366,9 @@ Future<void> _saveFileToDevice(
         },
       );
 
-      if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
+      if (!messenger.mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         _stitchSnack(
           savedPath == null ? 'Saved to Downloads' : 'Saved to $savedPath',
         ),
@@ -350,14 +386,16 @@ Future<void> _saveFileToDevice(
     final file = File(path);
     await file.writeAsBytes(fileData.bytes, flush: true);
 
-    if (!ctx.mounted) return;
-    ScaffoldMessenger.of(ctx).showSnackBar(
+    if (!messenger.mounted) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       _stitchSnack('Saved to ${file.path}'),
     );
     await OpenFilex.open(file.path);
   } catch (e) {
-    if (!ctx.mounted) return;
-    ScaffoldMessenger.of(ctx).showSnackBar(
+    if (!messenger.mounted) return;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       _stitchSnack('Save failed: $e'),
     );
   }

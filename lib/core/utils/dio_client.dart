@@ -67,6 +67,10 @@ class _AuthInterceptor extends Interceptor {
       if (token != null) {
         options.headers['Authorization'] = 'Bearer $token';
       }
+      // ignore: avoid_print
+      print(
+        'DEBUG: api request -> ${options.method} ${options.uri} auth: ${token != null ? 'Bearer ***' : 'none'}',
+      );
     }
     handler.next(options);
   }

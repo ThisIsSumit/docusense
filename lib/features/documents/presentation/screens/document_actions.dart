@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cross_file/cross_file.dart';
 import 'package:docusense/core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +17,8 @@ import 'package:docusense/features/documents/data/models/document_model.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:open_filex/open_filex.dart';
+
+const _storageChannel = MethodChannel('docusense/storage');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARE BOTTOM SHEET
@@ -318,6 +321,28 @@ Future<void> _saveFileToDevice(
               fallbackFileName: doc.fileName,
               fallbackMimeType: doc.mimeType,
             );
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final savedPath = await _storageChannel.invokeMethod<String>(
+        'saveToDownloads',
+        {
+          'bytes': fileData.bytes,
+          'fileName': fileData.fileName,
+          'mimeType': fileData.mimeType,
+        },
+      );
+
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        _stitchSnack(
+          savedPath == null ? 'Saved to Downloads' : 'Saved to $savedPath',
+        ),
+      );
+      if (savedPath != null) {
+        await OpenFilex.open(savedPath);
+      }
+      return;
+    }
+
     final Directory baseDir = (await getDownloadsDirectory()) ??
         await getApplicationDocumentsDirectory();
     final safeName = fileData.fileName;

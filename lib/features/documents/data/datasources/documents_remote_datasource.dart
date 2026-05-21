@@ -244,10 +244,15 @@ class DocumentsRemoteDatasource {
     String? fallbackMimeType,
   }) async {
     try {
+      final endpoint = '/documents/$id/download';
+      print('DEBUG: download request -> GET ${_dio.options.baseUrl}$endpoint');
       final res = await _dio.get<List<int>>(
-        '/documents/$id/download',
+        endpoint,
         options: Options(responseType: ResponseType.bytes),
       );
+
+      print(
+          'DEBUG: download response -> status: ${res.statusCode}, content-type: ${res.headers.value('content-type')}');
 
       final bytes = Uint8List.fromList(res.data ?? const <int>[]);
       if (bytes.isEmpty) {

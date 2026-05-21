@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:docusense/core/utils/dio_client.dart';
 import 'package:file_picker/file_picker.dart';
@@ -233,6 +234,65 @@ class DocumentsRemoteDatasource {
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
+  }
+
+  // ── Download file bytes ──────────────────────────────────────────────────
+
+  Future<({Uint8List bytes, String fileName, String mimeType})> downloadFile(
+    String id, {
+    String? fallbackFileName,
+    String? fallbackMimeType,
+  }) async {
+    try {
+      final res = await _dio.get<List<int>>(
+        '/documents/$id/download',
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final bytes = Uint8List.fromList(res.data ?? const <int>[]);
+      if (bytes.isEmpty) {
+        throw const ApiException(message: 'Downloaded file is empty');
+      }
+
+      final headers = res.headers.map;
+      final contentDisposition = headers['content-disposition']?.join(',');
+      final contentType = headers['content-type']?.join(',');
+      final fileName = _extractFileName(
+            contentDisposition,
+            fallback: fallbackFileName,
+          ) ??
+          'document-$id';
+
+      return (
+        bytes: bytes,
+        fileName: fileName,
+        mimeType: contentType ?? fallbackMimeType ?? 'application/octet-stream',
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  String? _extractFileName(String? contentDisposition, {String? fallback}) {
+    final header = contentDisposition;
+    if (header != null) {
+      for (final part in header.split(';')) {
+        final trimmed = part.trim();
+        if (trimmed.startsWith('filename=')) {
+          return trimmed
+              .substring('filename='.length)
+              .replaceAll('"', '')
+              .trim();
+        }
+        if (trimmed.startsWith('filename*=')) {
+          final value =
+              trimmed.substring('filename*='.length).replaceAll('"', '').trim();
+          final decoded = value.contains("''") ? value.split("''").last : value;
+          return Uri.decodeFull(decoded);
+        }
+      }
+    }
+    return fallback;
   }
 
   // ── Helper ────────────────────────────────────────────────────────────────

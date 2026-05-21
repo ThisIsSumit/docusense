@@ -1,7 +1,9 @@
+import 'dart:io';
+
+import 'package:cross_file/cross_file.dart';
 import 'package:docusense/core/constants/app_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +13,9 @@ import 'package:docusense/core/utils/dio_client.dart';
 import 'package:docusense/shared/widgets/app_widgets.dart';
 import 'package:docusense/features/documents/presentation/providers/documents_provider.dart';
 import 'package:docusense/features/documents/data/models/document_model.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:open_filex/open_filex.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARE BOTTOM SHEET
@@ -38,15 +43,30 @@ class _ShareBottomSheetState extends ConsumerState<ShareBottomSheet> {
 
   Future<void> _shareFile() async {
     setState(() => _shareLoading = true);
-    // In production: fetch file bytes then Share.shareXFiles(...)
-    // Requires share_plus: ^7.2.1
-    await Future.delayed(const Duration(milliseconds: 800)); // mock
+    try {
+      final fileData =
+          await ref.read(documentsRemoteDatasourceProvider).downloadFile(
+                widget.doc.id,
+                fallbackFileName: widget.doc.fileName,
+                fallbackMimeType: widget.doc.mimeType,
+              );
+      await Share.shareXFiles([
+        XFile.fromData(
+          fileData.bytes,
+          name: fileData.fileName,
+          mimeType: fileData.mimeType,
+        ),
+      ], text: widget.doc.title);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          _stitchSnack('Share failed: $e'),
+        );
+      }
+    }
     if (mounted) {
       setState(() => _shareLoading = false);
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        _stitchSnack('Share sheet — wire share_plus package'),
-      );
     }
   }
 
@@ -78,9 +98,7 @@ class _ShareBottomSheetState extends ConsumerState<ShareBottomSheet> {
           const SizedBox(height: 20),
           const Divider(height: 0.5),
           _SheetRow(
-            icon: _linkCopied
-                ? Icons.check_rounded
-                : Icons.link_rounded,
+            icon: _linkCopied ? Icons.check_rounded : Icons.link_rounded,
             iconColor: _linkCopied ? AppColors.green : null,
             label: _linkCopied ? 'Link copied!' : 'Copy deep link',
             labelColor: _linkCopied ? AppColors.green : null,
@@ -160,7 +178,7 @@ class DocumentActionsSheet extends ConsumerWidget {
             onTap: () {
               _pop(context);
               Future.delayed(const Duration(milliseconds: 120), () {
-                if (context.mounted) _downloadFile(context, doc);
+                if (context.mounted) _downloadFile(context, ref, doc);
               });
             },
           ),
@@ -170,8 +188,7 @@ class DocumentActionsSheet extends ConsumerWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text('DANGER ZONE',
-                  style: AppTextStyles.labelMD
-                      .copyWith(color: AppColors.ink3)),
+                  style: AppTextStyles.labelMD.copyWith(color: AppColors.ink3)),
             ),
           ),
           const SizedBox(height: 4),
@@ -264,10 +281,10 @@ void _showRenameDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
                   },
             child: loading
                 ? const SizedBox(
-                    width: 16, height: 16,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: AppColors.void0))
+                        strokeWidth: 1.5, color: AppColors.void0))
                 : const Text('Save'),
           ),
         ],
@@ -285,34 +302,40 @@ void _showTagsSheet(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
   );
 }
 
-void _downloadFile(BuildContext ctx, DocumentModel doc) {
-  // Production: use path_provider + dio bytes + open_file_plus
-  // For now show a Stitch-styled snack with progress sim
-  ScaffoldMessenger.of(ctx).showSnackBar(
-    SnackBar(
-      backgroundColor: AppColors.surface1,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: AppColors.wire, width: 0.5),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Saving ${doc.fileName}',
-              style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0)),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            color: AppColors.signal,
-            backgroundColor: AppColors.wire,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ],
-      ),
-      duration: const Duration(seconds: 2),
-    ),
-  );
+void _downloadFile(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
+  _saveFileToDevice(ctx, ref, doc);
+}
+
+Future<void> _saveFileToDevice(
+  BuildContext ctx,
+  WidgetRef ref,
+  DocumentModel doc,
+) async {
+  try {
+    final fileData =
+        await ref.read(documentsRemoteDatasourceProvider).downloadFile(
+              doc.id,
+              fallbackFileName: doc.fileName,
+              fallbackMimeType: doc.mimeType,
+            );
+    final Directory baseDir = (await getDownloadsDirectory()) ??
+        await getApplicationDocumentsDirectory();
+    final safeName = fileData.fileName;
+    final path = '${baseDir.path}${Platform.pathSeparator}$safeName';
+    final file = File(path);
+    await file.writeAsBytes(fileData.bytes, flush: true);
+
+    if (!ctx.mounted) return;
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      _stitchSnack('Saved to ${file.path}'),
+    );
+    await OpenFilex.open(file.path);
+  } catch (e) {
+    if (!ctx.mounted) return;
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      _stitchSnack('Save failed: $e'),
+    );
+  }
 }
 
 void _showReprocessDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
@@ -344,10 +367,13 @@ void _showReprocessDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
           onPressed: () async {
             Navigator.pop(ctx);
             try {
-              await ref.read(documentsRemoteDatasourceProvider).reprocess(doc.id);
+              await ref
+                  .read(documentsRemoteDatasourceProvider)
+                  .reprocess(doc.id);
               ref.invalidate(documentByIdProvider(doc.id));
               ScaffoldMessenger.of(ctx).showSnackBar(
-                _stitchSnack('Reprocessing started — check status in a few seconds'),
+                _stitchSnack(
+                    'Reprocessing started — check status in a few seconds'),
               );
             } on ApiException catch (e) {
               ScaffoldMessenger.of(ctx).showSnackBar(
@@ -373,7 +399,7 @@ void _showDeleteDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
         backgroundColor: AppColors.surface1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side:  BorderSide(color: AppColors.red.withOpacity(0.3), width: 0.5),
+          side: BorderSide(color: AppColors.red.withOpacity(0.3), width: 0.5),
         ),
         title: Text('Delete document', style: AppTextStyles.headingSM),
         content: Text(
@@ -385,8 +411,7 @@ void _showDeleteDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
           TextButton(
             onPressed: () => Navigator.pop(ctx2),
             child: Text('Cancel',
-                style: AppTextStyles.bodyMD
-                    .copyWith(color: AppColors.ink1)),
+                style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink1)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -412,10 +437,10 @@ void _showDeleteDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
                   },
             child: loading
                 ? const SizedBox(
-                    width: 16, height: 16,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: AppColors.void0))
+                        strokeWidth: 1.5, color: AppColors.void0))
                 : const Text('Delete',
                     style: TextStyle(color: AppColors.void0)),
           ),
@@ -471,7 +496,10 @@ class _TagsEditorSheetState extends State<_TagsEditorSheet> {
       setState(() => _tagError = 'Already added');
       return;
     }
-    setState(() { _tags.add(tag); _tagError = null; });
+    setState(() {
+      _tags.add(tag);
+      _tagError = null;
+    });
     _ctrl.clear();
   }
 
@@ -508,10 +536,12 @@ class _TagsEditorSheetState extends State<_TagsEditorSheet> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _tags.map((tag) => _TagChip(
-                  label: tag,
-                  onRemove: () => setState(() => _tags.remove(tag)),
-                )).toList(),
+                children: _tags
+                    .map((tag) => _TagChip(
+                          label: tag,
+                          onRemove: () => setState(() => _tags.remove(tag)),
+                        ))
+                    .toList(),
               ),
               const SizedBox(height: 16),
             ],
@@ -522,19 +552,17 @@ class _TagsEditorSheetState extends State<_TagsEditorSheet> {
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
-                    style: AppTextStyles.bodyMD
-                        .copyWith(color: AppColors.ink0),
+                    style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0),
                     cursorColor: AppColors.signal,
                     decoration: InputDecoration(
                       hintText: 'Add tag, press Enter...',
-                      hintStyle: AppTextStyles.bodyMD
-                          .copyWith(color: AppColors.ink3),
+                      hintStyle:
+                          AppTextStyles.bodyMD.copyWith(color: AppColors.ink3),
                       errorText: _tagError,
                     ),
                     onSubmitted: _addTag,
                     textInputAction: TextInputAction.done,
-                    onChanged: (_) =>
-                        setState(() => _tagError = null),
+                    onChanged: (_) => setState(() => _tagError = null),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -547,8 +575,7 @@ class _TagsEditorSheetState extends State<_TagsEditorSheet> {
                       color: AppColors.signalTrace,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                          color: AppColors.signal.withOpacity(0.3),
-                          width: 0.5),
+                          color: AppColors.signal.withOpacity(0.3), width: 0.5),
                     ),
                     child: const Icon(Icons.add_rounded,
                         color: AppColors.signal, size: 18),
@@ -582,8 +609,8 @@ class _TagChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.signalTrace,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-            color: AppColors.signal.withOpacity(0.2), width: 0.5),
+        border:
+            Border.all(color: AppColors.signal.withOpacity(0.2), width: 0.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -629,16 +656,16 @@ class _StitchSheet extends StatelessWidget {
 class _SheetHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
-    child: Container(
-      margin: const EdgeInsets.only(top: 10),
-      width: 32,
-      height: 3,
-      decoration: BoxDecoration(
-        color: AppColors.wireHot,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    ),
-  );
+        child: Container(
+          margin: const EdgeInsets.only(top: 10),
+          width: 32,
+          height: 3,
+          decoration: BoxDecoration(
+            color: AppColors.wireHot,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      );
 }
 
 class _SheetRow extends StatelessWidget {
@@ -669,11 +696,11 @@ class _SheetRow extends StatelessWidget {
           children: [
             isLoading
                 ? const SizedBox(
-                    width: 18, height: 18,
+                    width: 18,
+                    height: 18,
                     child: CircularProgressIndicator(
                         strokeWidth: 1.5, color: AppColors.signal))
-                : Icon(icon,
-                    color: iconColor ?? AppColors.ink1, size: 18),
+                : Icon(icon, color: iconColor ?? AppColors.ink1, size: 18),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -683,8 +710,7 @@ class _SheetRow extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: AppColors.ink3, size: 16),
+            Icon(Icons.chevron_right_rounded, color: AppColors.ink3, size: 16),
           ],
         ),
       ),
@@ -699,16 +725,21 @@ class _DocTypeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPdf  = mimeType.contains('pdf');
-    final isImg  = mimeType.contains('image');
-    final color  = isPdf ? AppColors.red
-                 : isImg ? AppColors.signal
-                 : AppColors.amber;
-    final icon   = isPdf ? Icons.picture_as_pdf_outlined
-                 : isImg ? Icons.image_outlined
-                 : Icons.description_outlined;
+    final isPdf = mimeType.contains('pdf');
+    final isImg = mimeType.contains('image');
+    final color = isPdf
+        ? AppColors.red
+        : isImg
+            ? AppColors.signal
+            : AppColors.amber;
+    final icon = isPdf
+        ? Icons.picture_as_pdf_outlined
+        : isImg
+            ? Icons.image_outlined
+            : Icons.description_outlined;
     return Container(
-      width: size, height: size,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
@@ -719,13 +750,13 @@ class _DocTypeIcon extends StatelessWidget {
 }
 
 SnackBar _stitchSnack(String msg) => SnackBar(
-  backgroundColor: AppColors.surface1,
-  behavior: SnackBarBehavior.floating,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(8),
-    side: const BorderSide(color: AppColors.wire, width: 0.5),
-  ),
-  content: Text(msg,
-      style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0)),
-  duration: const Duration(seconds: 2),
-);
+      backgroundColor: AppColors.surface1,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: AppColors.wire, width: 0.5),
+      ),
+      content: Text(msg,
+          style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0)),
+      duration: const Duration(seconds: 2),
+    );

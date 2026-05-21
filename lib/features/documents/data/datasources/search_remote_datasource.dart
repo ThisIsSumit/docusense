@@ -9,8 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-
-
 part 'search_remote_datasource.g.dart';
 
 @riverpod
@@ -28,7 +26,8 @@ class SearchRemoteDatasource {
   SearchRemoteDatasource({
     required Dio dio,
     required AuthStateNotifier authNotifier,
-  }) : _dio = dio, _auth = authNotifier;
+  })  : _dio = dio,
+        _auth = authNotifier;
 
   // ── Semantic chunk search (no AI answer) ──────────────────────────────────
 
@@ -56,17 +55,25 @@ class SearchRemoteDatasource {
 
   // ── RAG query — non-streaming ─────────────────────────────────────────────
 
-  Future<({String answer, List<SourceCitation> sources, int tokensUsed, int latencyMs})>
-      query({
+  Future<
+      ({
+        String answer,
+        List<SourceCitation> sources,
+        int tokensUsed,
+        int latencyMs
+      })> query({
     required String question,
     String? documentId,
   }) async {
     try {
-      final res = await _dio.post('/search/query', data: {
+      final requestData = {
         'question': question,
         if (documentId != null) 'documentId': documentId,
         'stream': false,
-      });
+      };
+      print('DEBUG: query request -> /search/query data: $requestData');
+      final res = await _dio.post('/search/query', data: requestData);
+      print('DEBUG: query response -> ${res.data}');
       final data = res.data['data'] as Map<String, dynamic>;
       final sources = (data['sources'] as List)
           .map((s) => SourceCitation.fromJson(s as Map<String, dynamic>))
@@ -103,6 +110,11 @@ class SearchRemoteDatasource {
     final token = await _auth.getCurrentAccessToken();
     final uri = Uri.parse('${AppConstants.baseUrl}/search/query');
 
+    final bodyMap = {
+      'question': question,
+      if (documentId != null) 'documentId': documentId,
+      'stream': true,
+    };
     final request = http.Request('POST', uri)
       ..headers.addAll({
         'Content-Type': 'application/json',
@@ -110,21 +122,20 @@ class SearchRemoteDatasource {
         'Cache-Control': 'no-cache',
         if (token != null) 'Authorization': 'Bearer $token',
       })
-      ..body = jsonEncode({
-        'question': question,
-        if (documentId != null) 'documentId': documentId,
-        'stream': true,
-      });
+      ..body = jsonEncode(bodyMap);
+
+    print(
+        'DEBUG: SSE request -> ${request.method} ${uri}\nheaders: ${request.headers}\nbody: ${request.body}');
 
     late http.StreamedResponse response;
     try {
       response = await request.send().timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw const ApiException(
-          message: 'Stream connection timed out',
-          code: 'STREAM_TIMEOUT',
-        ),
-      );
+            const Duration(seconds: 30),
+            onTimeout: () => throw const ApiException(
+              message: 'Stream connection timed out',
+              code: 'STREAM_TIMEOUT',
+            ),
+          );
     } on http.ClientException catch (e) {
       throw ApiException(
         message: 'Failed to connect to stream: ${e.message}',
@@ -132,10 +143,14 @@ class SearchRemoteDatasource {
       );
     }
 
+    print('DEBUG: SSE response status -> ${response.statusCode}');
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
+      print('DEBUG: SSE error body -> $body');
       Map<String, dynamic> errorBody = {};
-      try { errorBody = jsonDecode(body) as Map<String, dynamic>; } catch (_) {}
+      try {
+        errorBody = jsonDecode(body) as Map<String, dynamic>;
+      } catch (_) {}
       throw ApiException(
         statusCode: response.statusCode,
         message: (errorBody['error']?['message'] as String?) ?? 'Stream failed',
@@ -145,8 +160,7 @@ class SearchRemoteDatasource {
 
     // Parse SSE stream
     final buffer = StringBuffer();
-    await for (final chunk in response.stream
-        .transform(utf8.decoder)) {
+    await for (final chunk in response.stream.transform(utf8.decoder)) {
       buffer.write(chunk);
       final content = buffer.toString();
       final lines = content.split('\n');
@@ -159,16 +173,20 @@ class SearchRemoteDatasource {
         final rawJson = line.substring(6).trim();
         if (rawJson.isEmpty) continue;
 
+        print('DEBUG: SSE rawJson -> $rawJson');
+
         try {
           final payload = jsonDecode(rawJson) as Map<String, dynamic>;
+          print('DEBUG: SSE payload -> $payload');
           final type = payload['type'] as String?;
 
           switch (type) {
             case 'sources':
               final sources = (payload['sources'] as List?)
-                  ?.map((s) => SourceCitation.fromJson(
-                      s as Map<String, dynamic>))
-                  .toList() ?? [];
+                      ?.map((s) =>
+                          SourceCitation.fromJson(s as Map<String, dynamic>))
+                      .toList() ??
+                  [];
               yield SseSourcesEvent(sources: sources);
 
             case 'delta':
@@ -201,8 +219,8 @@ class SearchRemoteDatasource {
 
   // ── Query history ─────────────────────────────────────────────────────────
 
-  Future<({List<QueryHistoryItem> items, int total, bool hasMore})>
-      getHistory({int page = 1, int limit = 20}) async {
+  Future<({List<QueryHistoryItem> items, int total, bool hasMore})> getHistory(
+      {int page = 1, int limit = 20}) async {
     try {
       final res = await _dio.get('/search/history', queryParameters: {
         'page': page,
@@ -262,13 +280,13 @@ class SearchResult {
   });
 
   factory SearchResult.fromJson(Map<String, dynamic> json) => SearchResult(
-    chunkId: json['chunkId'] as String,
-    documentId: json['documentId'] as String,
-    documentTitle: json['documentTitle'] as String,
-    content: json['content'] as String,
-    pageNumber: json['pageNumber'] as int?,
-    similarity: (json['similarity'] as num).toDouble(),
-  );
+        chunkId: json['chunkId'] as String,
+        documentId: json['documentId'] as String,
+        documentTitle: json['documentTitle'] as String,
+        content: json['content'] as String,
+        pageNumber: json['pageNumber'] as int?,
+        similarity: (json['similarity'] as num).toDouble(),
+      );
 }
 
 // ── Query history item ────────────────────────────────────────────────────────

@@ -4,9 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../data/models/chat_models.dart';
-import '../providers/chat_provider.dart';
+import 'package:docusense/core/theme/app_theme.dart';
+import 'package:docusense/features/chat/data/models/chat_models.dart';
+import 'package:docusense/features/chat/presentation/providers/chat_provider.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String? documentId;

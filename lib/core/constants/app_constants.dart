@@ -1,6 +1,6 @@
 abstract class AppConstants {
   // API
-  static const baseUrl = 'http://192.168.0.3:3000/api/v1';
+  static const baseUrl = 'http://192.168.0.2:3000/api/v1';
   static const connectTimeout = Duration(seconds: 30);
   static const receiveTimeout = Duration(seconds: 60);
 

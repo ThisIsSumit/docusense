@@ -68,12 +68,20 @@ class SearchNotifier extends _$SearchNotifier {
 
   Future<void> _search(String query) async {
     try {
+      final requestData = {'query': query, 'limit': 20};
+      final endpoint = '${AppConstants.baseUrl}/search';
+      print('DEBUG: search request -> endpoint: $endpoint, data: $requestData');
+
       final results = await ref
           .read(searchRemoteDatasourceProvider)
           .search(query: query, limit: 20);
 
-      final recent =
-          [query, ...state.recentQueries.where((r) => r != query)].take(6).toList();
+      print(
+          'DEBUG: search response -> count: ${results.length}, results: $results');
+
+      final recent = [query, ...state.recentQueries.where((r) => r != query)]
+          .take(6)
+          .toList();
 
       state = (
         query: query,
@@ -116,8 +124,8 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  final _ctrl   = TextEditingController();
-  final _focus  = FocusNode();
+  final _ctrl = TextEditingController();
+  final _focus = FocusNode();
 
   @override
   void initState() {
@@ -244,9 +252,10 @@ class _SearchBar extends StatelessWidget {
             duration: AppConstants.microDuration,
             child: isSearching
                 ? const SizedBox(
-                    width: 18, height: 18,
+                    width: 18,
+                    height: 18,
                     child: CircularProgressIndicator(
-                      strokeWidth: 1.5, color: AppColors.signal),
+                        strokeWidth: 1.5, color: AppColors.signal),
                   )
                 : const Icon(Icons.search_rounded,
                     color: AppColors.ink2, size: 20),
@@ -271,7 +280,8 @@ class _SearchBar extends StatelessWidget {
           ),
           if (ctrl.text.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.ink2),
+              icon: const Icon(Icons.close_rounded,
+                  size: 16, color: AppColors.ink2),
               onPressed: onClear,
             ),
         ],
@@ -286,28 +296,39 @@ class _EmptyState extends StatelessWidget {
   final List<String> recentQueries;
   final ValueChanged<String> onSelectRecent;
 
-  const _EmptyState({super.key, required this.recentQueries, required this.onSelectRecent});
+  const _EmptyState(
+      {super.key, required this.recentQueries, required this.onSelectRecent});
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
-        Text('RECENT', style: AppTextStyles.labelMD.copyWith(color: AppColors.ink3)),
+        Text('RECENT',
+            style: AppTextStyles.labelMD.copyWith(color: AppColors.ink3)),
         const SizedBox(height: 10),
-        ...recentQueries.asMap().entries.map((e) =>
-          _RecentRow(
-            query: e.value,
-            index: e.key,
-            onTap: () => onSelectRecent(e.value),
-          ),
-        ),
+        ...recentQueries.asMap().entries.map(
+              (e) => _RecentRow(
+                query: e.value,
+                index: e.key,
+                onTap: () => onSelectRecent(e.value),
+              ),
+            ),
         const SizedBox(height: 28),
-        Text('TOPICS', style: AppTextStyles.labelMD.copyWith(color: AppColors.ink3)),
+        Text('TOPICS',
+            style: AppTextStyles.labelMD.copyWith(color: AppColors.ink3)),
         const SizedBox(height: 12),
         Wrap(
-          spacing: 8, runSpacing: 8,
-          children: ['finance', 'contracts', 'research', 'technical', 'reports', 'legal']
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            'finance',
+            'contracts',
+            'research',
+            'technical',
+            'reports',
+            'legal'
+          ]
               .map((t) => _TopicChip(label: t, onTap: () => onSelectRecent(t)))
               .toList(),
         ),
@@ -320,7 +341,8 @@ class _RecentRow extends StatelessWidget {
   final String query;
   final int index;
   final VoidCallback onTap;
-  const _RecentRow({required this.query, required this.index, required this.onTap});
+  const _RecentRow(
+      {required this.query, required this.index, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -338,15 +360,23 @@ class _RecentRow extends StatelessWidget {
           children: [
             const Icon(Icons.history_rounded, size: 15, color: AppColors.ink2),
             const SizedBox(width: 10),
-            Expanded(child: Text(query, style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink0))),
-            const Icon(Icons.north_west_rounded, size: 12, color: AppColors.ink3),
+            Expanded(
+                child: Text(query,
+                    style:
+                        AppTextStyles.bodyMD.copyWith(color: AppColors.ink0))),
+            const Icon(Icons.north_west_rounded,
+                size: 12, color: AppColors.ink3),
           ],
         ),
       ),
     )
         .animate()
         .fadeIn(delay: Duration(milliseconds: 40 * index), duration: 300.ms)
-        .slideX(begin: 0.04, end: 0, delay: Duration(milliseconds: 40 * index), curve: Curves.easeOutCubic);
+        .slideX(
+            begin: 0.04,
+            end: 0,
+            delay: Duration(milliseconds: 40 * index),
+            curve: Curves.easeOutCubic);
   }
 }
 
@@ -364,7 +394,8 @@ class _TopicChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.signalTrace,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppColors.signal.withOpacity(0.2), width: 0.5),
+          border:
+              Border.all(color: AppColors.signal.withOpacity(0.2), width: 0.5),
         ),
         child: Text('#$label', style: AppTextStyles.monoSM),
       ),
@@ -393,14 +424,19 @@ class _SearchingState extends StatelessWidget {
           ),
           child: Row(
             children: [
-              ShimmerBox(width: 38, height: 38, borderRadius: BorderRadius.circular(6)),
+              ShimmerBox(
+                  width: 38,
+                  height: 38,
+                  borderRadius: BorderRadius.circular(6)),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  ShimmerBox(width: double.infinity, height: 12),
-                  const SizedBox(height: 7),
-                  ShimmerBox(width: 140, height: 10),
-                ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ShimmerBox(width: double.infinity, height: 12),
+                      const SizedBox(height: 7),
+                      ShimmerBox(width: 140, height: 10),
+                    ]),
               ),
             ],
           ),
@@ -435,13 +471,17 @@ class _ErrorState extends StatelessWidget {
             GestureDetector(
               onTap: onRetry,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.signalTrace,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppColors.signal.withOpacity(0.3), width: 0.5),
+                  border: Border.all(
+                      color: AppColors.signal.withOpacity(0.3), width: 0.5),
                 ),
-                child: Text('Retry', style: AppTextStyles.bodyMD.copyWith(color: AppColors.signal)),
+                child: Text('Retry',
+                    style:
+                        AppTextStyles.bodyMD.copyWith(color: AppColors.signal)),
               ),
             ),
           ],
@@ -494,7 +534,8 @@ class _ResultsList extends StatelessWidget {
             Text('${results.length} results', style: AppTextStyles.monoSM),
             const Spacer(),
             Text('semantic · pgvector',
-                style: AppTextStyles.monoSM.copyWith(color: AppColors.signalDim)),
+                style:
+                    AppTextStyles.monoSM.copyWith(color: AppColors.signalDim)),
           ]),
         ),
         Expanded(
@@ -527,7 +568,8 @@ class _ResultsList extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.signalTrace,
                               borderRadius: BorderRadius.circular(3),
@@ -554,8 +596,12 @@ class _ResultsList extends StatelessWidget {
                     ),
                   )
                       .animate()
-                      .fadeIn(delay: Duration(milliseconds: 35 * i), duration: 300.ms)
-                      .slideY(begin: 0.05, end: 0,
+                      .fadeIn(
+                          delay: Duration(milliseconds: 35 * i),
+                          duration: 300.ms)
+                      .slideY(
+                          begin: 0.05,
+                          end: 0,
                           delay: Duration(milliseconds: 35 * i),
                           curve: Curves.easeOutCubic),
                 ),
@@ -586,7 +632,9 @@ class _HighlightText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (query.isEmpty) {
-      return Text(text, style: style, maxLines: maxLines,
+      return Text(text,
+          style: style,
+          maxLines: maxLines,
           overflow: maxLines != null ? TextOverflow.ellipsis : null);
     }
     final lower = text.toLowerCase();
@@ -595,11 +643,16 @@ class _HighlightText extends StatelessWidget {
     int start = 0;
     while (true) {
       final idx = lower.indexOf(lowerQ, start);
-      if (idx == -1) { spans.add(TextSpan(text: text.substring(start), style: style)); break; }
-      if (idx > start) spans.add(TextSpan(text: text.substring(start, idx), style: style));
+      if (idx == -1) {
+        spans.add(TextSpan(text: text.substring(start), style: style));
+        break;
+      }
+      if (idx > start)
+        spans.add(TextSpan(text: text.substring(start, idx), style: style));
       spans.add(TextSpan(
         text: text.substring(idx, idx + query.length),
-        style: style.copyWith(color: AppColors.signal, backgroundColor: AppColors.signalTrace),
+        style: style.copyWith(
+            color: AppColors.signal, backgroundColor: AppColors.signalTrace),
       ));
       start = idx + query.length;
     }

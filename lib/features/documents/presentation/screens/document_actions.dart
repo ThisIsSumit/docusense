@@ -5,12 +5,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../documents/data/datasources/documents_remote_datasource.dart';
-import '../../../../core/utils/dio_client.dart';
-import '../../../../shared/widgets/app_widgets.dart';
-import '../providers/documents_provider.dart';
-import '../../data/models/document_model.dart';
+import 'package:docusense/core/theme/app_theme.dart';
+import 'package:docusense/features/documents/data/datasources/documents_remote_datasource.dart';
+import 'package:docusense/core/utils/dio_client.dart';
+import 'package:docusense/shared/widgets/app_widgets.dart';
+import 'package:docusense/features/documents/presentation/providers/documents_provider.dart';
+import 'package:docusense/features/documents/data/models/document_model.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARE BOTTOM SHEET

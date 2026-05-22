@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
+
 import 'dart:io';
 
 import 'package:cross_file/cross_file.dart';
@@ -100,14 +102,14 @@ class _ShareBottomSheetState extends ConsumerState<ShareBottomSheet> {
           ),
           const SizedBox(height: 20),
           const Divider(height: 0.5),
-          _SheetRow(
-            icon: _linkCopied ? Icons.check_rounded : Icons.link_rounded,
-            iconColor: _linkCopied ? AppColors.green : null,
-            label: _linkCopied ? 'Link copied!' : 'Copy deep link',
-            labelColor: _linkCopied ? AppColors.green : null,
-            onTap: _copyLink,
-          ),
-          const Divider(height: 0.5),
+          // _SheetRow(
+          //   icon: _linkCopied ? Icons.check_rounded : Icons.link_rounded,
+          //   iconColor: _linkCopied ? AppColors.green : null,
+          //   label: _linkCopied ? 'Link copied!' : 'Copy deep link',
+          //   labelColor: _linkCopied ? AppColors.green : null,
+          //   onTap: _copyLink,
+          // ),
+          // const Divider(height: 0.5),
           _SheetRow(
             icon: Icons.ios_share_rounded,
             label: 'Share file',
@@ -473,8 +475,10 @@ void _showDeleteDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx2),
-            child: Text('Cancel',
-                style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink1)),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.bodyMD.copyWith(color: AppColors.ink1),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -503,9 +507,14 @@ void _showDeleteDialog(BuildContext ctx, WidgetRef ref, DocumentModel doc) {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 1.5, color: AppColors.void0))
-                : const Text('Delete',
-                    style: TextStyle(color: AppColors.void0)),
+                      strokeWidth: 1.5,
+                      color: AppColors.void0,
+                    ),
+                  )
+                : const Text(
+                    'Delete',
+                    style: TextStyle(color: AppColors.void0),
+                  ),
           ),
         ],
       ),
